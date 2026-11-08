@@ -695,7 +695,7 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
       glbModel = gltf.scene;
       glbModel.scale.setScalar(1);
 
-      // Enhance materials for bright anime rendering
+      // Enhance materials for bright anime rendering with harmonized brown hair and natural light beige skin
       glbModel.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           o.castShadow = true;
@@ -704,22 +704,46 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
           materials.forEach((mat) => {
             if (mat instanceof THREE.MeshStandardMaterial) {
               mat.roughness = 0.45;
-              mat.metalness = 0.05;
-              mat.envMapIntensity = 1.4;
+              mat.metalness = 0.04;
+              mat.envMapIntensity = 1.0;
               if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
               const name = (mat.name || '').toLowerCase();
-              if (name.includes('face') || name.includes('skin') || name.includes('body')) {
-                mat.emissive = new THREE.Color(0x403028);
-                mat.emissiveIntensity = 0.55;
-              } else if (name.includes('eye') || name.includes('iris') || name.includes('highlight') || name.includes('eyewhite')) {
-                mat.emissive = new THREE.Color(0x505050);
-                mat.emissiveIntensity = 0.5;
+
+              if (name.includes('hairback')) {
+                // Back hair: cancel the orange/reddish undertone and match the front chocolate brown hair
+                mat.color.setRGB(0.44, 0.30, 0.18);
+                mat.emissive = new THREE.Color(0x120a06);
+                mat.emissiveIntensity = 0.10;
               } else if (name.includes('hair')) {
-                mat.emissive = new THREE.Color(0x352015);
-                mat.emissiveIntensity = 0.4;
+                // Front hair: rich, uniform chocolate brown
+                mat.color.setRGB(0.92, 0.88, 0.84);
+                mat.emissive = new THREE.Color(0x120a06);
+                mat.emissiveIntensity = 0.10;
+              } else if (name.includes('brow') || name.includes('eyelash') || name.includes('eyeline')) {
+                // Eyebrows and eyelashes: crisp dark chocolate espresso
+                mat.color.setHex(0x221108);
+                mat.emissive = new THREE.Color(0x100804);
+                mat.emissiveIntensity = 0.10;
+              } else if (name.includes('mouth')) {
+                // Mouth / lips: natural warm rose-coral
+                mat.color.setHex(0xc46e66);
+                mat.emissive = new THREE.Color(0x26100e);
+                mat.emissiveIntensity = 0.12;
+              } else if (
+                (name.includes('skin') || name.includes('face') || name.includes('body')) &&
+                !name.includes('eye')
+              ) {
+                // Skin: natural light beige complexion, not stark white or washed out
+                // Texture base is pale peach, multiplying by warm beige gives a healthy, soft beige
+                mat.color.setRGB(0.86, 0.72, 0.62);
+                mat.emissive = new THREE.Color(0x1a120c);
+                mat.emissiveIntensity = 0.08;
+              } else if (name.includes('eye') || name.includes('iris') || name.includes('highlight') || name.includes('eyewhite')) {
+                mat.emissive = new THREE.Color(0x303030);
+                mat.emissiveIntensity = 0.25;
               } else if (name.includes('cloth') || name.includes('tops') || name.includes('shoes')) {
-                mat.emissive = new THREE.Color(0x2d2218);
-                mat.emissiveIntensity = 0.35;
+                mat.emissive = new THREE.Color(0x1e1610);
+                mat.emissiveIntensity = 0.20;
               }
             }
           });

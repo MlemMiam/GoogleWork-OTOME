@@ -118,8 +118,8 @@ export default function App() {
     const florie = createFlorie(scene, stateRef.current.x, stateRef.current.z);
     florieRef.current = florie;
 
-    // Gentle character follow light to ensure Florie's face and clothes are always well-illuminated
-    const charLight = new THREE.PointLight(0xfffaec, 0.65, 8, 1.4);
+    // Soft character key light positioned in front of her to gently illuminate face and clothes
+    const charLight = new THREE.PointLight(0xfffaee, 0.35, 10, 1.8);
     scene.add(charLight);
 
     // Camera raycaster & vectors for smooth damping
@@ -335,8 +335,10 @@ export default function App() {
 
       // Sun follows player for crisp shadows
       sun.position.set(st.x + 26, 46, st.z + 18);
-      sun.target.position.set(st.x, 0, st.z);
-      charLight.position.set(st.x, 1.4, st.z);
+      // Position gentle fill light slightly in front of Florie facing her
+      const frontX = Math.sin(st.facing) * 1.2;
+      const frontZ = Math.cos(st.facing) * 1.2;
+      charLight.position.set(st.x + frontX, 1.4, st.z + frontZ);
 
       // Waving American flag
       const fp = flagGeo.attributes.position;
