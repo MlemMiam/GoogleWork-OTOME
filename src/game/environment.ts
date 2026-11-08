@@ -34,9 +34,17 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
 
-  // Lights
-  const hemi = new THREE.HemisphereLight(0xe3f1ff, 0x6f7d4c, 0.78);
+  // Lights: Warm ambient light + cool hemisphere fill so indoor and outdoor areas are bright
+  const ambient = new THREE.AmbientLight(0xfff8ee, 0.72);
+  scene.add(ambient);
+
+  const hemi = new THREE.HemisphereLight(0xe8f4ff, 0x8a927a, 0.95);
   scene.add(hemi);
+
+  // Soft fill light from the school side so character face is well-lit in closeups
+  const fillLight = new THREE.DirectionalLight(0xfffaea, 0.6);
+  fillLight.position.set(-15, 25, -35);
+  scene.add(fillLight);
 
   const sun = new THREE.DirectionalLight(0xfff0d6, 1.15);
   if (!isSoftwareGl) {
@@ -326,13 +334,18 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
   [-24, -12, 0, 12, 24].forEach((x) =>
     [-13.5, -18.5].forEach((z) => mkBox(2.2, 0.05, 0.6, x, 4.14, z, M.light, { shadow: false }))
   );
-  if (!isSoftwareGl) {
-    [-18, 0, 18].forEach((x) => {
-      const p = new THREE.PointLight(0xfff0d0, 0.55, 24, 1.6);
-      p.position.set(x, 3.7, -16);
-      scene.add(p);
-    });
-  }
+  // Interior hall lights
+  [-20, -10, 0, 10, 20].forEach((x) => {
+    const p = new THREE.PointLight(0xfffae6, 0.9, 26, 1.4);
+    p.position.set(x, 3.8, -16);
+    scene.add(p);
+  });
+  // Classroom lights
+  [-22, -7, 7, 22].forEach((cx) => {
+    const roomLight = new THREE.PointLight(0xfff8e8, 0.95, 20, 1.4);
+    roomLight.position.set(cx, 3.8, -26);
+    scene.add(roomLight);
+  });
 
   // Hallway benches
   [-14, 14].forEach((x) => {

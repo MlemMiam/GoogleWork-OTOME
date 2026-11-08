@@ -33,7 +33,7 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
   procGroup.add(body);
   rootGroup.add(procGroup);
 
-  let activeModel: 'procedural' | 'glb' = 'procedural';
+  let activeModel: 'procedural' | 'glb' = 'glb';
 
   // Cel-shading 3-tone gradient map
   const GRAD = new THREE.DataTexture(new Uint8Array([80, 210, 255]), 3, 1, THREE.RedFormat);
@@ -684,68 +684,117 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
   let glbMixer: THREE.AnimationMixer | null = null;
   let glbLoaded = false;
   const boneMap: Record<string, THREE.Bone> = {};
-  const initialRot: Record<string, { x: number; y: number; z: number }> = {};
+  const initialQuat: Record<string, THREE.Quaternion> = {};
 
   const loader = new GLTFLoader();
-  const GLB_URL = 'https://raw.githubusercontent.com/MlemMiam/Otome-Project/main/florie.glb';
+  const GLB_URL = '/models/florie.glb';
 
   loader.load(
     GLB_URL,
     (gltf) => {
       glbModel = gltf.scene;
       glbModel.scale.setScalar(1);
+
+      // Enhance materials for bright anime rendering
       glbModel.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           o.castShadow = true;
-          o.receiveShadow = false;
+          o.receiveShadow = true;
+          const materials = Array.isArray(o.material) ? o.material : [o.material];
+          materials.forEach((mat) => {
+            if (mat instanceof THREE.MeshStandardMaterial) {
+              mat.roughness = 0.45;
+              mat.metalness = 0.05;
+              mat.envMapIntensity = 1.4;
+              if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+              const name = (mat.name || '').toLowerCase();
+              if (name.includes('face') || name.includes('skin') || name.includes('body')) {
+                mat.emissive = new THREE.Color(0x403028);
+                mat.emissiveIntensity = 0.55;
+              } else if (name.includes('eye') || name.includes('iris') || name.includes('highlight') || name.includes('eyewhite')) {
+                mat.emissive = new THREE.Color(0x505050);
+                mat.emissiveIntensity = 0.5;
+              } else if (name.includes('hair')) {
+                mat.emissive = new THREE.Color(0x352015);
+                mat.emissiveIntensity = 0.4;
+              } else if (name.includes('cloth') || name.includes('tops') || name.includes('shoes')) {
+                mat.emissive = new THREE.Color(0x2d2218);
+                mat.emissiveIntensity = 0.35;
+              }
+            }
+          });
         }
+
         if (o.type === 'Bone') {
           const bone = o as THREE.Bone;
-          const n = bone.name.toLowerCase();
+          const n = bone.name;
+          if (n.toLowerCase().includes('collider')) return;
+
           boneMap[n] = bone;
-          initialRot[n] = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
-          if (/hips|j_bip_c_hips/i.test(bone.name)) {
+          initialQuat[n] = bone.quaternion.clone();
+
+          if (n === 'J_Bip_C_Hips') {
             boneMap._hips = bone;
-            initialRot._hips = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._hips = bone.quaternion.clone();
           }
-          if (/spine|j_bip_c_spine/i.test(bone.name)) {
+          if (n === 'J_Bip_C_Spine') {
             boneMap._spine = bone;
-            initialRot._spine = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._spine = bone.quaternion.clone();
           }
-          if (/neck|j_bip_c_neck/i.test(bone.name)) {
+          if (n === 'J_Bip_C_Neck') {
             boneMap._neck = bone;
-            initialRot._neck = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._neck = bone.quaternion.clone();
           }
-          if (/head|j_bip_c_head/i.test(bone.name)) {
+          if (n === 'J_Bip_C_Head') {
             boneMap._head = bone;
-            initialRot._head = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._head = bone.quaternion.clone();
           }
-          if (/leftupperleg|j_bip_l_upperleg/i.test(bone.name)) {
+          if (n === 'J_Bip_L_UpperLeg') {
             boneMap._lLeg = bone;
-            initialRot._lLeg = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._lLeg = bone.quaternion.clone();
           }
-          if (/rightupperleg|j_bip_r_upperleg/i.test(bone.name)) {
+          if (n === 'J_Bip_R_UpperLeg') {
             boneMap._rLeg = bone;
-            initialRot._rLeg = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._rLeg = bone.quaternion.clone();
           }
-          if (/leftupperarm|j_bip_l_upperarm/i.test(bone.name)) {
+          if (n === 'J_Bip_L_LowerLeg') {
+            boneMap._lKnee = bone;
+            initialQuat._lKnee = bone.quaternion.clone();
+          }
+          if (n === 'J_Bip_R_LowerLeg') {
+            boneMap._rKnee = bone;
+            initialQuat._rKnee = bone.quaternion.clone();
+          }
+          if (n === 'J_Bip_L_UpperArm') {
             boneMap._lArm = bone;
-            initialRot._lArm = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._lArm = bone.quaternion.clone();
           }
-          if (/rightupperarm|j_bip_r_upperarm/i.test(bone.name)) {
+          if (n === 'J_Bip_R_UpperArm') {
             boneMap._rArm = bone;
-            initialRot._rArm = { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z };
+            initialQuat._rArm = bone.quaternion.clone();
+          }
+          if (n === 'J_Bip_L_LowerArm') {
+            boneMap._lForearm = bone;
+            initialQuat._lForearm = bone.quaternion.clone();
+          }
+          if (n === 'J_Bip_R_LowerArm') {
+            boneMap._rForearm = bone;
+            initialQuat._rForearm = bone.quaternion.clone();
           }
         }
       });
 
-      // Default relaxed arm pose if in T-pose
-      if (boneMap._lArm && initialRot._lArm) boneMap._lArm.rotation.z = initialRot._lArm.z - 1.15;
-      if (boneMap._rArm && initialRot._rArm) boneMap._rArm.rotation.z = initialRot._rArm.z + 1.15;
-
       glbLoaded = true;
-      glbModel.visible = false;
       rootGroup.add(glbModel);
+
+      // Set active model to glb if activeModel is 'glb'
+      if (activeModel === 'glb') {
+        procGroup.visible = false;
+        glbModel.visible = true;
+      } else {
+        glbModel.visible = false;
+        procGroup.visible = true;
+      }
 
       if (gltf.animations && gltf.animations.length > 0) {
         glbMixer = new THREE.AnimationMixer(glbModel);
@@ -756,6 +805,8 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
     undefined,
     () => {
       glbLoaded = false;
+      activeModel = 'procedural';
+      procGroup.visible = true;
     }
   );
 
@@ -785,19 +836,51 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         glbMixer.timeScale = walk * (isShift ? 1.6 : 1.0);
         glbMixer.update(dt);
       } else {
-        if (boneMap._lLeg && initialRot._lLeg)
-          boneMap._lLeg.rotation.x = initialRot._lLeg.x + s * amp * 0.9;
-        if (boneMap._rLeg && initialRot._rLeg)
-          boneMap._rLeg.rotation.x = initialRot._rLeg.x - s * amp * 0.9;
-        if (boneMap._lArm && initialRot._lArm)
-          boneMap._lArm.rotation.x = initialRot._lArm.x - s * amp * 0.7;
-        if (boneMap._rArm && initialRot._rArm)
-          boneMap._rArm.rotation.x = initialRot._rArm.x + s * amp * 0.7;
-        const breathe = Math.sin(time * 2) * 0.006 * (1 - walk);
-        if (boneMap._spine && initialRot._spine)
-          boneMap._spine.rotation.x = initialRot._spine.x + breathe;
-        if (boneMap._head && initialRot._head)
-          boneMap._head.rotation.z = initialRot._head.z + Math.sin(phase * 0.5) * 0.025 * walk;
+        // VRoid humanoid bone animation:
+        // rotateX(-1.25) lowers arms down from T-pose to rest naturally along the skirt
+        if (boneMap._lArm && initialQuat._lArm) {
+          boneMap._lArm.quaternion.copy(initialQuat._lArm);
+          boneMap._lArm.rotateX(-1.25);
+          // Walking swing around Z axis
+          boneMap._lArm.rotateZ(s * amp * 0.45);
+        }
+        if (boneMap._rArm && initialQuat._rArm) {
+          boneMap._rArm.quaternion.copy(initialQuat._rArm);
+          boneMap._rArm.rotateX(-1.25);
+          // Walking swing opposite
+          boneMap._rArm.rotateZ(-s * amp * 0.45);
+        }
+
+        // Forearm: natural slight bend forward at rest
+        if (boneMap._lForearm && initialQuat._lForearm) {
+          boneMap._lForearm.quaternion.copy(initialQuat._lForearm);
+          boneMap._lForearm.rotateX(-0.15);
+        }
+        if (boneMap._rForearm && initialQuat._rForearm) {
+          boneMap._rForearm.quaternion.copy(initialQuat._rForearm);
+          boneMap._rForearm.rotateX(-0.15);
+        }
+
+        // Legs: rotateX swings legs forward/backward naturally
+        if (boneMap._lLeg && initialQuat._lLeg) {
+          boneMap._lLeg.quaternion.copy(initialQuat._lLeg);
+          boneMap._lLeg.rotateX(s * amp * 0.65);
+        }
+        if (boneMap._rLeg && initialQuat._rLeg) {
+          boneMap._rLeg.quaternion.copy(initialQuat._rLeg);
+          boneMap._rLeg.rotateX(-s * amp * 0.65);
+        }
+
+        // Spine breathing and Head bobbing
+        if (boneMap._spine && initialQuat._spine) {
+          const breathe = Math.sin(time * 2) * 0.005 * (1 - walk);
+          boneMap._spine.quaternion.copy(initialQuat._spine);
+          boneMap._spine.rotateX(breathe);
+        }
+        if (boneMap._head && initialQuat._head) {
+          boneMap._head.quaternion.copy(initialQuat._head);
+          boneMap._head.rotateY(Math.sin(phase * 0.5) * 0.02 * walk);
+        }
       }
     } else {
       // Procedural model animation

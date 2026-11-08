@@ -38,7 +38,7 @@ export default function App() {
   });
   const [playerHud, setPlayerHud] = useState({ x: 0, z: 16, facing: Math.PI });
   const [isCloseup, setIsCloseup] = useState(false);
-  const [activeModel, setActiveModel] = useState<'procedural' | 'glb'>('procedural');
+  const [activeModel, setActiveModel] = useState<'procedural' | 'glb'>('glb');
   const [isGlbLoaded, setIsGlbLoaded] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
@@ -117,6 +117,10 @@ export default function App() {
     // Build Florie character
     const florie = createFlorie(scene, stateRef.current.x, stateRef.current.z);
     florieRef.current = florie;
+
+    // Gentle character follow light to ensure Florie's face and clothes are always well-illuminated
+    const charLight = new THREE.PointLight(0xfffaec, 0.65, 8, 1.4);
+    scene.add(charLight);
 
     // Camera raycaster & vectors for smooth damping
     const ray = new THREE.Raycaster();
@@ -332,6 +336,7 @@ export default function App() {
       // Sun follows player for crisp shadows
       sun.position.set(st.x + 26, 46, st.z + 18);
       sun.target.position.set(st.x, 0, st.z);
+      charLight.position.set(st.x, 1.4, st.z);
 
       // Waving American flag
       const fp = flagGeo.attributes.position;
