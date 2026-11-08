@@ -1,0 +1,6 @@
+{
+  "name": "Florie à East High",
+  "description": "Prototype 3D interactif de Florie explorant le lycée East High avec vue à la troisième personne, intérieurs et extérieurs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
