@@ -726,6 +726,10 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
   let shyRemaining = 0;
   let stillTime = 0;
   let nextShyDelay = randomBetween(SHY_MIN_STILL, SHY_MAX_STILL);
+  // Scratch objects reused by the transition scoop, so the idle loop stays
+  // allocation-free.
+  const scoopAxis = new THREE.Vector3(0, 0, 1);
+  const scoopQuat = new THREE.Quaternion();
 
   const setupIdleMixer = (model: THREE.Group) => {
     if (glbMixer) {
@@ -987,16 +991,18 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
 
       // While fading in or out of the shy pose, swing the upper arms slightly
       // forward so the hands travel in front of the dress instead of through it.
-      const shyScoop = Math.sin(Math.PI * shyBlend) * 0.24;
+      // The smoothstep bump starts and ends with zero velocity, so the extra
+      // swing never shows as a kick on the transition.
+      const ease = shyBlend * shyBlend * (3 - 2 * shyBlend);
+      const shyScoop = 4 * ease * (1 - ease) * 0.24;
       if (shyScoop > 0.001) {
-        const scoop = new THREE.Quaternion();
         if (boneMap._lArm) {
-          scoop.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -shyScoop);
-          boneMap._lArm.quaternion.multiply(scoop);
+          scoopQuat.setFromAxisAngle(scoopAxis, -shyScoop);
+          boneMap._lArm.quaternion.multiply(scoopQuat);
         }
         if (boneMap._rArm) {
-          scoop.setFromAxisAngle(new THREE.Vector3(0, 0, 1), shyScoop);
-          boneMap._rArm.quaternion.multiply(scoop);
+          scoopQuat.setFromAxisAngle(scoopAxis, shyScoop);
+          boneMap._rArm.quaternion.multiply(scoopQuat);
         }
       }
 

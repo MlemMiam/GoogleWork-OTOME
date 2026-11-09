@@ -41,10 +41,32 @@ const CORE_BONES = [
   'J_Bip_R_Hand',
   'J_Bip_L_Thumb1',
   'J_Bip_L_Thumb2',
-  'J_Bip_L_Thumb3',
   'J_Bip_R_Thumb1',
   'J_Bip_R_Thumb2',
-  'J_Bip_R_Thumb3',
+  'J_Bip_L_Index1',
+  'J_Bip_L_Index2',
+  'J_Bip_L_Index3',
+  'J_Bip_L_Middle1',
+  'J_Bip_L_Middle2',
+  'J_Bip_L_Middle3',
+  'J_Bip_L_Ring1',
+  'J_Bip_L_Ring2',
+  'J_Bip_L_Ring3',
+  'J_Bip_L_Little1',
+  'J_Bip_L_Little2',
+  'J_Bip_L_Little3',
+  'J_Bip_R_Index1',
+  'J_Bip_R_Index2',
+  'J_Bip_R_Index3',
+  'J_Bip_R_Middle1',
+  'J_Bip_R_Middle2',
+  'J_Bip_R_Middle3',
+  'J_Bip_R_Ring1',
+  'J_Bip_R_Ring2',
+  'J_Bip_R_Ring3',
+  'J_Bip_R_Little1',
+  'J_Bip_R_Little2',
+  'J_Bip_R_Little3',
   'J_Bip_L_UpperLeg',
   'J_Bip_R_UpperLeg',
   'J_Bip_L_LowerLeg',
@@ -140,8 +162,8 @@ function applyShyPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_R_UpperArm', -0.10, 0, 0.42);
   // The right forearm reaches a little further, so the right hand rests in
   // front of the left one with a small gap between them.
-  localRotate(bases, 'J_Bip_L_LowerArm', -0.60, 0, -0.25);
-  localRotate(bases, 'J_Bip_R_LowerArm', -0.66, 0, 0.27);
+  localRotate(bases, 'J_Bip_L_LowerArm', -0.55, 0, -0.25);
+  localRotate(bases, 'J_Bip_R_LowerArm', -0.61, 0, 0.27);
   // Part of the palm twist happens in the forearm, so the sleeve cuffs turn
   // with the hands instead of being cut through by the wrist heels.
   localRotate(bases, 'J_Bip_L_LowerArm', 0, 0.50, 0);
@@ -149,14 +171,27 @@ function applyShyPose(bases: PoseSet) {
 
   // Wrists turn the palms toward the belly and angle both hands diagonally,
   // so they leave the sleeve cuffs cleanly instead of bending across them.
-  localRotate(bases, 'J_Bip_L_Hand', 0.65, 0.84, -0.35);
-  localRotate(bases, 'J_Bip_R_Hand', 0.68, -0.88, 0.35);
+  localRotate(bases, 'J_Bip_L_Hand', 0.50, 0.84, -0.35);
+  localRotate(bases, 'J_Bip_R_Hand', 0.53, -0.88, 0.35);
 
-  // Thumbs fold back toward the fingers instead of sticking out.
-  localRotate(bases, 'J_Bip_L_Thumb1', 0, 0, 0.85);
-  localRotate(bases, 'J_Bip_L_Thumb2', 0, 0, 0.35);
-  localRotate(bases, 'J_Bip_R_Thumb1', 0, 0, -0.85);
-  localRotate(bases, 'J_Bip_R_Thumb2', 0, 0, -0.35);
+  // Thumbs curl loosely toward the fingers.
+  localRotate(bases, 'J_Bip_L_Thumb1', 0, 0, 0.45);
+  localRotate(bases, 'J_Bip_L_Thumb2', 0, 0, 0.15);
+  localRotate(bases, 'J_Bip_R_Thumb1', 0, 0, -0.45);
+  localRotate(bases, 'J_Bip_R_Thumb2', 0, 0, -0.15);
+
+  // A soft finger curl keeps the clasped hands from looking like flat paddles.
+  const curl: Array<[number, number]> = [
+    [1, -0.10],
+    [2, -0.16],
+    [3, -0.10],
+  ];
+  for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
+    for (const [segment, angle] of curl) {
+      localRotate(bases, `J_Bip_L_${finger}${segment}`, angle, 0, 0);
+      localRotate(bases, `J_Bip_R_${finger}${segment}`, angle, 0, 0);
+    }
+  }
 
   // Knees and feet turned slightly inward.
   localRotate(bases, 'J_Bip_L_UpperLeg', 0, 0.02, -0.03);
@@ -251,6 +286,28 @@ function addSecondaryMotions(
   });
 }
 
+/**
+ * Fingers and thumbs keep the same rotation all along, but they still need a
+ * track in both clips: without one, the mixer leaves them stuck in the shy
+ * pose after the blend back to the gentle idle.
+ */
+function addHandMotions(motions: Record<string, Motion>) {
+  const names = [
+    'J_Bip_L_Thumb1',
+    'J_Bip_L_Thumb2',
+    'J_Bip_R_Thumb1',
+    'J_Bip_R_Thumb2',
+  ];
+  for (const side of ['L', 'R']) {
+    for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
+      for (const segment of [1, 2, 3]) {
+        names.push(`J_Bip_${side}_${finger}${segment}`);
+      }
+    }
+  }
+  for (const name of names) motions[name] = {};
+}
+
 function buildIdleMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   const breath = (t: number) => Math.sin((TAU * t) / 3);
   const sway = (t: number) => Math.sin((TAU * t) / IDLE_DURATION);
@@ -322,11 +379,6 @@ function buildIdleMotions(secondary: THREE.Bone[]): Record<string, Motion> {
       rx: (t) => 0.015 * sway(t + 1.75),
       rz: (t) => -0.010 * Math.sin((TAU * t) / 3 + 1.2),
     },
-    // Kept still, but present in both clips so the thumbs blend with the pose.
-    J_Bip_L_Thumb1: {},
-    J_Bip_L_Thumb2: {},
-    J_Bip_R_Thumb1: {},
-    J_Bip_R_Thumb2: {},
     J_Bip_L_UpperLeg: {
       rx: (t) => 0.006 * breath(t + 0.5),
       rz: (t) => 0.010 * sway(t + 0.2),
@@ -349,6 +401,7 @@ function buildIdleMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     },
   };
 
+  addHandMotions(motions);
   addSecondaryMotions(motions, secondary, IDLE_DURATION);
   return motions;
 }
@@ -409,11 +462,6 @@ function buildShyMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     J_Bip_R_Hand: {
       rx: (t) => 0.010 * sway(t + 1.3),
     },
-    // Kept still, but present in both clips so the thumbs blend with the pose.
-    J_Bip_L_Thumb1: {},
-    J_Bip_L_Thumb2: {},
-    J_Bip_R_Thumb1: {},
-    J_Bip_R_Thumb2: {},
     J_Bip_L_UpperLeg: {
       rz: (t) => 0.005 * sway(t + 0.2),
     },
@@ -422,6 +470,7 @@ function buildShyMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     },
   };
 
+  addHandMotions(motions);
   addSecondaryMotions(motions, secondary, SHY_DURATION, 0.6);
   return motions;
 }
