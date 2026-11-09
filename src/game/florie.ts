@@ -948,6 +948,19 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         const closeR = dict['Fcl_EYE_Close_R'];
         if (closeL !== undefined && closeIdx === undefined) targets[closeL] = currentBlink;
         if (closeR !== undefined && closeIdx === undefined) targets[closeR] = currentBlink;
+
+        // A subtle shy expression: slightly lowered upper lids, inner brows
+        // raised, a small mouth and a soft upturn of the corners.
+        const shyExpr: Record<string, number> = {
+          Fcl_EYE_Sorrow: 0.30,
+          Fcl_BRW_Sorrow: 0.30,
+          Fcl_MTH_Small: 0.35,
+          Fcl_MTH_Up: 0.20,
+        };
+        for (const [name, weight] of Object.entries(shyExpr)) {
+          const idx = dict[name];
+          if (idx !== undefined) targets[idx] = shyBlend * weight;
+        }
       }
     });
 
