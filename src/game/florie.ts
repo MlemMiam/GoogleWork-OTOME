@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { plaidTex } from './textures';
+import { createIdleAnimationClip } from './idleAnimation';
 
 export interface FlorieCharacter {
   group: THREE.Group;
@@ -715,11 +716,25 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
   const boneMap: Record<string, THREE.Bone> = {};
   const initialQuat: Record<string, THREE.Quaternion> = {};
 
-  const setupMixerWithClip = (model: THREE.Group, clip: THREE.AnimationClip) => {
+  let idleUsesBasePose = false;
+
+  const setupIdleMixer = (model: THREE.Group, baseClip?: THREE.AnimationClip) => {
+    if (glbMixer) {
+      glbMixer.stopAllAction();
+      glbMixer.uncacheRoot(model);
+    }
+    const idleClip = createIdleAnimationClip(model, baseClip);
     glbMixer = new THREE.AnimationMixer(model);
-    idleAction = glbMixer.clipAction(clip);
+    idleAction = glbMixer.clipAction(idleClip);
     idleAction.setLoop(THREE.LoopRepeat, Infinity);
     idleAction.play();
+    idleUsesBasePose = Boolean(baseClip);
+  };
+
+  const refreshIdlePose = (model: THREE.Group, baseClip: THREE.AnimationClip) => {
+    // Prefer the authored base pose, but only rebuild once to avoid resetting
+    // the generated idle while the user is already walking around.
+    if (!idleUsesBasePose) setupIdleMixer(model, baseClip);
   };
 
   const fbxLoader = new FBXLoader();
@@ -740,8 +755,8 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
           filteredTracks
         );
         loadedIdleClip = clip;
-        if (glbModel && !glbMixer) {
-          setupMixerWithClip(glbModel, loadedIdleClip);
+        if (glbModel) {
+          refreshIdlePose(glbModel, loadedIdleClip);
         }
       }
     },
@@ -891,13 +906,15 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         procGroup.visible = true;
       }
 
-      // If bashful idle clip already loaded, initialize mixer
-      if (loadedIdleClip && !glbMixer) {
-        setupMixerWithClip(glbModel, loadedIdleClip);
+      // Build the generated gentle idle immediately, then refresh with the
+      // authored base pose if the FBX clip arrives later.
+      if (loadedIdleClip) {
+        setupIdleMixer(glbModel, loadedIdleClip);
       } else if (gltf.animations && gltf.animations.length > 0) {
-        glbMixer = new THREE.AnimationMixer(glbModel);
-        const idle = gltf.animations.find((a) => /idle/i.test(a.name)) || gltf.animations[0];
-        glbMixer.clipAction(idle).play();
+        const baseClip = gltf.animations.find((a) => /idle/i.test(a.name)) || gltf.animations[0];
+        setupIdleMixer(glbModel, baseClip);
+      } else {
+        setupIdleMixer(glbModel);
       }
     },
     undefined,

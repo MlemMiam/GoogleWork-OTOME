@@ -39,7 +39,7 @@ npm run build
 
 - `src/App.tsx` : point d'entrée de l'expérience, boucle de rendu, contrôles et HUD.
 - `src/components/` : composants d'interface React (menus, commandes, mini-carte).
-- `src/game/` : logique Three.js, personnage, environnement, physique, audio et textures générées.
+- `src/game/` : logique Three.js, personnage, environnement, physique, audio, textures générées et animation d'idle procédurale.
 - `public/models/` : modèles 3D servis tels quels par Vite.
 - `public/assets/` : ressources statiques et captures du projet.
 - `.aistudio/` : fichiers de travail et médias conservés depuis AI Studio.
