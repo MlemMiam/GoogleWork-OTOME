@@ -129,11 +129,18 @@ function applyShyPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_R_Shoulder', -0.03, 0, 0.05);
 
   // Elbows stay slightly outside the torso while the forearms angle inward,
-  // so the hands rest in front of the belly without crossing each other.
+  // bringing both hands together in front of the belly.
   localRotate(bases, 'J_Bip_L_UpperArm', -0.10, 0, -0.40);
-  localRotate(bases, 'J_Bip_R_UpperArm', -0.10, 0, 0.40);
-  localRotate(bases, 'J_Bip_L_LowerArm', -0.55, 0, -0.27);
-  localRotate(bases, 'J_Bip_R_LowerArm', -0.55, 0, 0.27);
+  localRotate(bases, 'J_Bip_R_UpperArm', -0.10, 0, 0.44);
+  // The right forearm reaches a little further, so the right hand rests in
+  // front of the left one instead of colliding with it.
+  localRotate(bases, 'J_Bip_L_LowerArm', -0.72, 0, -0.25);
+  localRotate(bases, 'J_Bip_R_LowerArm', -0.66, 0, 0.30);
+
+  // Wrists turn the palms so both hands hang the same way and the right one
+  // rests over the left, like folded hands.
+  localRotate(bases, 'J_Bip_L_Hand', 0.65, 0, 0);
+  localRotate(bases, 'J_Bip_R_Hand', 0.68, 0, 0);
 
   // Knees and feet turned slightly inward.
   localRotate(bases, 'J_Bip_L_UpperLeg', 0, 0.02, -0.03);
@@ -326,7 +333,8 @@ function buildIdleMotions(secondary: THREE.Bone[]): Record<string, Motion> {
 }
 
 function buildShyMotions(secondary: THREE.Bone[]): Record<string, Motion> {
-  const breath = (t: number) => Math.sin((TAU * t) / 2.8);
+  // Two breath cycles per loop so the clip wraps without a visible hitch.
+  const breath = (t: number) => Math.sin((4 * Math.PI * t) / SHY_DURATION);
   const sway = (t: number) => Math.sin((TAU * t) / SHY_DURATION);
   const glance = (t: number) => Math.sin((TAU * t) / SHY_DURATION + 1.1);
 
@@ -344,11 +352,11 @@ function buildShyMotions(secondary: THREE.Bone[]): Record<string, Motion> {
       rx: (t) => 0.005 * breath(t + 0.1),
     },
     J_Bip_C_Neck: {
-      rx: (t) => 0.004 * Math.sin((TAU * t) / 2.8 + 0.4),
+      rx: (t) => 0.004 * Math.sin((4 * Math.PI * t) / SHY_DURATION + 0.4),
       rz: (t) => 0.005 * sway(t + 0.5),
     },
     J_Bip_C_Head: {
-      rx: (t) => 0.008 * Math.sin((TAU * t) / 2.8 + 0.8),
+      rx: (t) => 0.008 * Math.sin((4 * Math.PI * t) / SHY_DURATION + 0.8),
       ry: (t) => 0.020 * glance(t),
       rz: (t) => 0.012 * sway(t + 0.6),
     },
