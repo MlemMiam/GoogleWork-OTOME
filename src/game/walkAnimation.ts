@@ -49,7 +49,7 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     const p = phi(t) + phaseOffset;
     const h1 = Math.sin(p - 1.0);
     const curve = 0.5 + 0.5 * h1;
-    return 0.06 + 0.36 * Math.pow(Math.max(0, curve), 2);
+    return 0.06 + 0.40 * Math.pow(Math.max(0, curve), 2);
   };
 
   // Ankle roll curve: plantarflexion at toe push-off, gentle dorsiflexion at heel contact
@@ -61,18 +61,18 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   // Gentle arm swing: subtle contralateral pendulum, single frequency, no
   // wobble. Amplitudes kept small so the arms just sway with the gait
   // without forming an undesirable curve.
-  const armAmp = 0.12;
+  const armAmp = 0.20;
   // Single, clean contralateral swing (no lagged component -> no curve).
   const armSwingL = (t: number) => -armAmp * Math.sin(phi(t) - 0.10);
   const armSwingR = (t: number) => armAmp * Math.sin(phi(t) - 0.10);
 
   // Shoulder roll follows the arm swing, very softly.
-  const shoulderRollL = (t: number) => -0.03 * Math.sin(phi(t) - 0.05);
-  const shoulderRollR = (t: number) => 0.03 * Math.sin(phi(t) - 0.05);
+  const shoulderRollL = (t: number) => -0.05 * Math.sin(phi(t) - 0.05);
+  const shoulderRollR = (t: number) => 0.05 * Math.sin(phi(t) - 0.05);
 
   // Wrist trails the forearm lightly.
-  const wristTrailL = (t: number) => -0.04 * Math.sin(phi(t) - 0.60);
-  const wristTrailR = (t: number) => 0.04 * Math.sin(phi(t) - 0.60);
+  const wristTrailL = (t: number) => -0.06 * Math.sin(phi(t) - 0.60);
+  const wristTrailR = (t: number) => 0.06 * Math.sin(phi(t) - 0.60);
 
 
   const motions: Record<string, Motion> = {
@@ -83,9 +83,9 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
       // Graceful lateral weight shift
       px: (t) => 0.008 * Math.sin(phi(t)),
       // Feminine hip sway / pelvic roll
-      rz: (t) => 0.026 * Math.sin(phi(t)),
+      rz: (t) => 0.030 * Math.sin(phi(t)),
       // Pelvic yaw following the advancing leg
-      ry: (t) => -0.030 * Math.sin(phi(t)),
+      ry: (t) => -0.034 * Math.sin(phi(t)),
       // Upright posture with gentle cyclic breathing
       rx: (t) => 0.018 + 0.004 * Math.cos(2 * phi(t)),
     },
@@ -149,12 +149,12 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
 
     // --- Legs (Thighs, Knees, Feet) ---
     J_Bip_L_UpperLeg: {
-      rx: (t) => 0.30 * Math.sin(phi(t)),
+      rx: (t) => 0.30 * Math.sin(phi(t)) + 0.06 * Math.sin(phi(t) - 0.45),
       ry: () => -0.010,
       rz: () => 0.014,
     },
     J_Bip_R_UpperLeg: {
-      rx: (t) => -0.30 * Math.sin(phi(t)),
+      rx: (t) => -0.30 * Math.sin(phi(t)) - 0.06 * Math.sin(phi(t) - 0.45),
       ry: () => 0.010,
       rz: () => -0.014,
     },
