@@ -1022,34 +1022,89 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
       }
 
       if (walkWeight > 0.02) {
-        // Blend walk cycle on legs
+        // Delicate, elegant anime walk for Florie: light steps, graceful arms,
+        // subtle hip sway and a steady, slightly dipped head.
+        const step = s;                       // -1..1, one cycle per step pair
+        const step2 = Math.sin(phase * 2);    // double frequency for bounce
+        const ampLeg = walk * (isShift ? 0.50 : 0.38);
+        const ampArm = walk * (isShift ? 0.26 : 0.18);
+
+        // Legs: lighter swing, with a touch of knee flex on the supporting leg.
         if (boneMap._lLeg && initialQuat._lLeg) {
           const swingQ = initialQuat._lLeg.clone();
-          swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), s * amp * 0.65));
+          swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), step * ampLeg));
           boneMap._lLeg.quaternion.slerp(swingQ, walkWeight);
         }
         if (boneMap._rLeg && initialQuat._rLeg) {
           const swingQ = initialQuat._rLeg.clone();
-          swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -s * amp * 0.65));
+          swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -step * ampLeg));
           boneMap._rLeg.quaternion.slerp(swingQ, walkWeight);
         }
+        if (boneMap._lKnee && initialQuat._lKnee) {
+          const kneeQ = initialQuat._lKnee.clone();
+          const kneeFlex = Math.max(0, -step) * 0.16 * walk;
+          kneeQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), kneeFlex));
+          boneMap._lKnee.quaternion.slerp(kneeQ, walkWeight);
+        }
+        if (boneMap._rKnee && initialQuat._rKnee) {
+          const kneeQ = initialQuat._rKnee.clone();
+          const kneeFlex = Math.max(0, step) * 0.16 * walk;
+          kneeQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), kneeFlex));
+          boneMap._rKnee.quaternion.slerp(kneeQ, walkWeight);
+        }
 
-        // Arm swing when walking
+        // Hips: subtle sway plus a tiny bounce.
+        if (boneMap._hips && initialQuat._hips) {
+          const hipQ = initialQuat._hips.clone();
+          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), step * 0.045 * walk));
+          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), step2 * 0.035 * walk));
+          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.abs(step2) * 0.025 * walk));
+          boneMap._hips.quaternion.slerp(hipQ, walkWeight);
+        }
+
+        // Spine: slight forward lean and a gentle counter-twist.
+        if (boneMap._spine && initialQuat._spine) {
+          const spineQ = initialQuat._spine.clone();
+          spineQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.05 * walk));
+          spineQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.025 * walk));
+          boneMap._spine.quaternion.slerp(spineQ, walkWeight);
+        }
+
+        // Arms: graceful, small swing, held closer to the body.
         if (boneMap._lArm && initialQuat._lArm) {
           const armQ = initialQuat._lArm.clone();
-          const armEuler = new THREE.Euler(-1.25, 0, s * amp * 0.45, 'YXZ');
+          const armEuler = new THREE.Euler(-1.12, 0, -step * ampArm, 'YXZ');
           armQ.multiply(new THREE.Quaternion().setFromEuler(armEuler));
           boneMap._lArm.quaternion.slerp(armQ, walkWeight);
         }
         if (boneMap._rArm && initialQuat._rArm) {
           const armQ = initialQuat._rArm.clone();
-          const armEuler = new THREE.Euler(-1.25, 0, -s * amp * 0.45, 'YXZ');
+          const armEuler = new THREE.Euler(-1.12, 0, step * ampArm, 'YXZ');
           armQ.multiply(new THREE.Quaternion().setFromEuler(armEuler));
           boneMap._rArm.quaternion.slerp(armQ, walkWeight);
         }
+        // Forearms: a gentle elbow bend so the arms stay soft.
+        if (boneMap._lForearm && initialQuat._lForearm) {
+          const fQ = initialQuat._lForearm.clone();
+          fQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.22 * walk));
+          boneMap._lForearm.quaternion.slerp(fQ, walkWeight);
+        }
+        if (boneMap._rForearm && initialQuat._rForearm) {
+          const fQ = initialQuat._rForearm.clone();
+          fQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.22 * walk));
+          boneMap._rForearm.quaternion.slerp(fQ, walkWeight);
+        }
 
         if (boneMap._head && initialQuat._head) {
-          boneMap._head.rotateY(Math.sin(phase * 0.5) * 0.02 * walk);
+          const headQ = initialQuat._head.clone();
+          headQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), step * 0.012 * walk));
+          headQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.abs(step2) * 0.01 * walk));
+          boneMap._head.quaternion.slerp(headQ, walkWeight);
+        }
+        if (boneMap._neck && initialQuat._neck) {
+          const neckQ = initialQuat._neck.clone();
+          neckQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.008 * walk));
+          boneMap._neck.quaternion.slerp(neckQ, walkWeight);
         }
       } else if (!glbMixer) {
         // Fallback procedural pose before the mixer is ready.
