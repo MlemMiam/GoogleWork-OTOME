@@ -128,11 +128,12 @@ function applyShyPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_L_Shoulder', 0.03, 0, -0.05);
   localRotate(bases, 'J_Bip_R_Shoulder', -0.03, 0, 0.05);
 
-  // Elbows bent so both hands meet in front of the belly.
-  localRotate(bases, 'J_Bip_L_UpperArm', -0.50, 0, -0.25);
-  localRotate(bases, 'J_Bip_R_UpperArm', -0.50, 0, 0.25);
-  localRotate(bases, 'J_Bip_L_LowerArm', 0, 0, -0.62);
-  localRotate(bases, 'J_Bip_R_LowerArm', 0, 0, 0.62);
+  // Elbows stay slightly outside the torso while the forearms angle inward,
+  // so the hands rest in front of the belly without crossing each other.
+  localRotate(bases, 'J_Bip_L_UpperArm', -0.10, 0, -0.40);
+  localRotate(bases, 'J_Bip_R_UpperArm', -0.10, 0, 0.40);
+  localRotate(bases, 'J_Bip_L_LowerArm', -0.55, 0, -0.27);
+  localRotate(bases, 'J_Bip_R_LowerArm', -0.55, 0, 0.27);
 
   // Knees and feet turned slightly inward.
   localRotate(bases, 'J_Bip_L_UpperLeg', 0, 0.02, -0.03);

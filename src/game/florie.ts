@@ -985,6 +985,21 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         glbMixer.update(dt);
       }
 
+      // While fading in or out of the shy pose, swing the upper arms slightly
+      // forward so the hands travel in front of the dress instead of through it.
+      const shyScoop = Math.sin(Math.PI * shyBlend) * 0.24;
+      if (shyScoop > 0.001) {
+        const scoop = new THREE.Quaternion();
+        if (boneMap._lArm) {
+          scoop.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -shyScoop);
+          boneMap._lArm.quaternion.multiply(scoop);
+        }
+        if (boneMap._rArm) {
+          scoop.setFromAxisAngle(new THREE.Vector3(0, 0, 1), shyScoop);
+          boneMap._rArm.quaternion.multiply(scoop);
+        }
+      }
+
       if (walkWeight > 0.02) {
         // Blend walk cycle on legs
         if (boneMap._lLeg && initialQuat._lLeg) {
