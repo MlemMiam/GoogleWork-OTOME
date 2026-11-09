@@ -139,6 +139,24 @@ export function applyRelaxedPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_R_LowerArm', -0.10, 0, -0.10);
   localRotate(bases, 'J_Bip_L_Hand', 0, 0, 0.04);
   localRotate(bases, 'J_Bip_R_Hand', 0, 0, -0.04);
+
+  // Fingers rest slightly curled toward the palm (same as the walk pose).
+  const curl: Array<[number, number]> = [
+    [1, -0.14],
+    [2, -0.19],
+    [3, -0.24],
+  ];
+  for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
+    for (const [segment, angle] of curl) {
+      localRotate(bases, `J_Bip_L_${finger}${segment}`, angle, 0, 0);
+      localRotate(bases, `J_Bip_R_${finger}${segment}`, angle, 0, 0);
+    }
+  }
+  // Thumbs curl softly toward the fingers.
+  localRotate(bases, 'J_Bip_L_Thumb1', 0, 0, 0.32);
+  localRotate(bases, 'J_Bip_L_Thumb2', 0, 0, 0.14);
+  localRotate(bases, 'J_Bip_R_Thumb1', 0, 0, -0.32);
+  localRotate(bases, 'J_Bip_R_Thumb2', 0, 0, -0.14);
   // Final local swing pulls the hands forward, next to the skirt without clipping.
   localSwing(bases, 'J_Bip_L_UpperArm', -0.30);
   localSwing(bases, 'J_Bip_R_UpperArm', 0.30);
