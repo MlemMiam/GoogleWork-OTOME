@@ -59,16 +59,17 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     return 0.16 * Math.sin(p - 1.6) - 0.06 * Math.sin(2 * (p - 1.6));
   };
 
-  // Arm swing pitch: generous front-to-back swing, contralateral to leg stride (opposite arm & leg)
-  // Left arm swings forward (negative phi phase) when right leg steps forward
-  const armPitchL = (t: number) => -0.44 * Math.sin(phi(t) - 0.08);
-  const armPitchR = (t: number) => 0.44 * Math.sin(phi(t) - 0.08);
+  // Arm swing pitch: forward-only swing, contralateral to leg stride (opposite arm & leg)
+  // Left arm swings forward (negative) when right leg steps forward; right arm swings forward (positive) when left leg steps forward
+  // Only the forward half of the cycle is kept, so the arm snaps back to neutral instead of swinging backward
+  const armPitchL = (t: number) => -0.44 * Math.max(0, Math.sin(phi(t) - 0.08));
+  const armPitchR = (t: number) => 0.44 * Math.max(0, -Math.sin(phi(t) - 0.08));
 
   // Active elbow joint rotation on top of the initial relaxed bend:
-  // Reversed and slightly amplified for a softer, more natural arm swing
-  // (up to ~+0.51 rad extra bend, down to ~-0.19 rad)
-  const elbowPitchL = (t: number) => 0.16 - 0.25 * Math.sin(phi(t) - 0.38);
-  const elbowPitchR = (t: number) => 0.16 + 0.25 * Math.sin(phi(t) - 0.38);
+  // Elbow bends backward when the forearm swings forward, then returns to neutral
+  // Elbow bends backward when the forearm swings forward, then returns to neutral
+  const elbowPitchL = (t: number) => 0.16 - 0.25 * Math.max(0, Math.sin(phi(t) - 0.38));
+  const elbowPitchR = (t: number) => 0.16 - 0.25 * Math.max(0, -Math.sin(phi(t) - 0.38));
 
   // Wrist trailing wave: fluid whip-like trailing wave following the forearm
   const wristPitchL = (t: number) => -0.16 * Math.sin(phi(t) - 0.68);
