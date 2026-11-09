@@ -131,16 +131,16 @@ function applyShyPose(bases: PoseSet) {
   // Elbows stay slightly outside the torso while the forearms angle inward,
   // bringing both hands together in front of the belly.
   localRotate(bases, 'J_Bip_L_UpperArm', -0.10, 0, -0.40);
-  localRotate(bases, 'J_Bip_R_UpperArm', -0.10, 0, 0.44);
+  localRotate(bases, 'J_Bip_R_UpperArm', -0.10, 0, 0.42);
   // The right forearm reaches a little further, so the right hand rests in
-  // front of the left one instead of colliding with it.
-  localRotate(bases, 'J_Bip_L_LowerArm', -0.72, 0, -0.25);
-  localRotate(bases, 'J_Bip_R_LowerArm', -0.66, 0, 0.30);
+  // front of the left one with a small gap between them.
+  localRotate(bases, 'J_Bip_L_LowerArm', -0.60, 0, -0.25);
+  localRotate(bases, 'J_Bip_R_LowerArm', -0.66, 0, 0.27);
 
-  // Wrists turn the palms so both hands hang the same way and the right one
-  // rests over the left, like folded hands.
-  localRotate(bases, 'J_Bip_L_Hand', 0.65, 0, 0);
-  localRotate(bases, 'J_Bip_R_Hand', 0.68, 0, 0);
+  // Wrists turn the palms toward the belly so both hands lie flat against it,
+  // the right one resting over the left with a small gap between them.
+  localRotate(bases, 'J_Bip_L_Hand', 0.65, 1.34, 0);
+  localRotate(bases, 'J_Bip_R_Hand', 0.68, -1.38, 0);
 
   // Knees and feet turned slightly inward.
   localRotate(bases, 'J_Bip_L_UpperLeg', 0, 0.02, -0.03);
