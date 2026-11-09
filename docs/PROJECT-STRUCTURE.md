@@ -5,7 +5,7 @@
 - `src/main.tsx` monte l'application React.
 - `src/App.tsx` assemble l'interface et pilote la scène Three.js.
 - `src/components/` regroupe les composants React de l'interface et des contrôles.
-- `src/game/` regroupe la scène, le personnage, les collisions, l'audio, les textures et l'animation d'idle générée.
+- `src/game/` regroupe la scène, le personnage, les collisions, l'audio, les textures et les animations d'idle générées (idle douce et idle timide déclenchée aléatoirement).
 
 ## Ressources publiques
 

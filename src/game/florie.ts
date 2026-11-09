@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { plaidTex } from './textures';
-import { createIdleAnimationClip } from './idleAnimation';
+import { createIdleAnimationClip, createShyIdleAnimationClip } from './idleAnimation';
 
 export interface FlorieCharacter {
   group: THREE.Group;
@@ -710,20 +710,47 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
   let glbModel: THREE.Group | null = null;
   let glbMixer: THREE.AnimationMixer | null = null;
   let idleAction: THREE.AnimationAction | null = null;
+  let shyAction: THREE.AnimationAction | null = null;
   let glbLoaded = false;
   const boneMap: Record<string, THREE.Bone> = {};
   const initialQuat: Record<string, THREE.Quaternion> = {};
+
+  // Shy idle state machine: it kicks in randomly when Florie stands still.
+  const SHY_MIN_STILL = 8;
+  const SHY_MAX_STILL = 16;
+  const SHY_MIN_DURATION = 4;
+  const SHY_MAX_DURATION = 7;
+  const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
+  let shyBlend = 0;
+  let shyActive = false;
+  let shyRemaining = 0;
+  let stillTime = 0;
+  let nextShyDelay = randomBetween(SHY_MIN_STILL, SHY_MAX_STILL);
 
   const setupIdleMixer = (model: THREE.Group) => {
     if (glbMixer) {
       glbMixer.stopAllAction();
       glbMixer.uncacheRoot(model);
     }
+    // Build both clips before the mixer touches the skeleton, so each one is
+    // captured from the same neutral rest pose.
     const idleClip = createIdleAnimationClip(model);
+    const shyClip = createShyIdleAnimationClip(model);
+
     glbMixer = new THREE.AnimationMixer(model);
     idleAction = glbMixer.clipAction(idleClip);
     idleAction.setLoop(THREE.LoopRepeat, Infinity);
     idleAction.play();
+
+    shyAction = glbMixer.clipAction(shyClip);
+    shyAction.setLoop(THREE.LoopRepeat, Infinity);
+    shyAction.setEffectiveWeight(0);
+    shyAction.play();
+
+    shyBlend = 0;
+    shyActive = false;
+    stillTime = 0;
+    nextShyDelay = randomBetween(SHY_MIN_STILL, SHY_MAX_STILL);
   };
 
   const loader = new GLTFLoader();
@@ -925,9 +952,35 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
       const walkWeight = Math.min(1, walk * 2.0);
       const idleWeight = 1 - walkWeight;
 
+      // Random shy idle when Florie has been standing still for a while.
+      const isStill = walkWeight < 0.05;
+      if (shyActive) {
+        shyRemaining -= dt;
+        if (!isStill || shyRemaining <= 0) {
+          shyActive = false;
+          stillTime = 0;
+          nextShyDelay = randomBetween(SHY_MIN_STILL, SHY_MAX_STILL);
+        }
+      } else if (isStill) {
+        stillTime += dt;
+        if (stillTime >= nextShyDelay) {
+          shyActive = true;
+          shyRemaining = randomBetween(SHY_MIN_DURATION, SHY_MAX_DURATION);
+        }
+      } else {
+        stillTime = 0;
+      }
+
+      const shyTarget = shyActive ? 1 : 0;
+      shyBlend += (shyTarget - shyBlend) * Math.min(1, dt * 2.2);
+      if (!shyActive && shyBlend < 0.002) shyBlend = 0;
+
       if (glbMixer) {
         if (idleAction) {
-          idleAction.setEffectiveWeight(idleWeight);
+          idleAction.setEffectiveWeight(idleWeight * (1 - shyBlend));
+        }
+        if (shyAction) {
+          shyAction.setEffectiveWeight(idleWeight * shyBlend);
         }
         glbMixer.update(dt);
       }
@@ -963,7 +1016,7 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
           boneMap._head.rotateY(Math.sin(phase * 0.5) * 0.02 * walk);
         }
       } else if (!glbMixer) {
-        // Fallback procedural pose if FBX animation is still loading
+        // Fallback procedural pose before the mixer is ready.
         if (boneMap._lArm && initialQuat._lArm) {
           boneMap._lArm.quaternion.copy(initialQuat._lArm);
           boneMap._lArm.rotateX(-1.25);

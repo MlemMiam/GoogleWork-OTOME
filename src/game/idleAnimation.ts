@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const TAU = Math.PI * 2;
 const IDLE_DURATION = 6;
+const SHY_DURATION = 5;
 const SAMPLE_FPS = 30;
 
 type BoneBase = {
@@ -21,12 +22,40 @@ type Motion = {
   pz?: (t: number) => number;
 };
 
+type PoseSet = Record<string, BoneBase>;
+
+const CORE_BONES = [
+  'J_Bip_C_Hips',
+  'J_Bip_C_Spine',
+  'J_Bip_C_Chest',
+  'J_Bip_C_UpperChest',
+  'J_Bip_C_Neck',
+  'J_Bip_C_Head',
+  'J_Bip_L_Shoulder',
+  'J_Bip_R_Shoulder',
+  'J_Bip_L_UpperArm',
+  'J_Bip_R_UpperArm',
+  'J_Bip_L_LowerArm',
+  'J_Bip_R_LowerArm',
+  'J_Bip_L_Hand',
+  'J_Bip_R_Hand',
+  'J_Bip_L_UpperLeg',
+  'J_Bip_R_UpperLeg',
+  'J_Bip_L_LowerLeg',
+  'J_Bip_R_LowerLeg',
+  'J_Bip_L_Foot',
+  'J_Bip_R_Foot',
+];
+
+const SECONDARY_PATTERN =
+  /J_Sec_(Hair|L_Skirt|R_Skirt|L_LowerSleeve|L_TipSleeve|R_LowerSleeve|R_TipSleeve)/;
+
 /**
- * Builds a soft, looping anime idle entirely from keyframes. The model rest
- * pose is used as a neutral base, with a relaxed A-pose adjustment so the
- * arms rest naturally along the body.
+ * Collects the animated bones with their neutral transforms. The model rest
+ * pose is used as a base, so every generated clip starts from the same
+ * skeleton state and can be blended safely.
  */
-export function createIdleAnimationClip(root: THREE.Object3D): THREE.AnimationClip {
+function collectPose(root: THREE.Object3D): { bases: PoseSet; secondary: THREE.Bone[] } {
   const bones: Record<string, THREE.Bone> = {};
   root.traverse((object) => {
     if ((object as THREE.Bone).isBone && !object.name.toLowerCase().includes('collider')) {
@@ -34,82 +63,171 @@ export function createIdleAnimationClip(root: THREE.Object3D): THREE.AnimationCl
     }
   });
 
-  const bases: Record<string, BoneBase> = {};
-
-  const capture = (name: string) => {
-    const bone = bones[name];
-    if (!bone) return;
-    bases[name] = {
-      bone,
-      quaternion: bone.quaternion.clone(),
-      position: bone.position.clone(),
-    };
-  };
-
-  // Core pose bones.
-  [
-    'J_Bip_C_Hips',
-    'J_Bip_C_Spine',
-    'J_Bip_C_Chest',
-    'J_Bip_C_UpperChest',
-    'J_Bip_C_Neck',
-    'J_Bip_C_Head',
-    'J_Bip_L_Shoulder',
-    'J_Bip_R_Shoulder',
-    'J_Bip_L_UpperArm',
-    'J_Bip_R_UpperArm',
-    'J_Bip_L_LowerArm',
-    'J_Bip_R_LowerArm',
-    'J_Bip_L_Hand',
-    'J_Bip_R_Hand',
-    'J_Bip_L_UpperLeg',
-    'J_Bip_R_UpperLeg',
-    'J_Bip_L_LowerLeg',
-    'J_Bip_R_LowerLeg',
-    'J_Bip_L_Foot',
-    'J_Bip_R_Foot',
-  ].forEach(capture);
-
-  // Secondary bones (hair, skirt, sleeves) add the soft anime follow-through.
-  const secondaryBones = Object.values(bones).filter(
-    (bone) =>
-      !bone.name.includes('_end_') &&
-      /J_Sec_(Hair|L_Skirt|R_Skirt|L_LowerSleeve|L_TipSleeve|R_LowerSleeve|R_TipSleeve)/.test(bone.name)
-  );
-  secondaryBones.forEach((bone) => {
+  const bases: PoseSet = {};
+  const capture = (bone: THREE.Bone) => {
     bases[bone.name] = {
       bone,
       quaternion: bone.quaternion.clone(),
       position: bone.position.clone(),
     };
+  };
+
+  CORE_BONES.forEach((name) => {
+    if (bones[name]) capture(bones[name]);
   });
 
-  // Relaxed A-pose: bring the arms down and slightly outward so the hands
-  // clear the skirt. The final local-Z swing pulls the hands forward, next to
-  // the skirt instead of behind it.
-  const relaxed = (name: string, x: number, y: number, z: number) => {
-    const base = bases[name];
-    if (!base) return;
-    const offset = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, 'XYZ'));
-    base.quaternion.multiply(offset);
-  };
-  const swingForward = (name: string, angle: number) => {
-    const base = bases[name];
-    if (!base) return;
-    base.quaternion.multiply(
-      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle)
+  // Secondary bones (hair, skirt, sleeves) add the soft anime follow-through.
+  const secondary = Object.values(bones).filter(
+    (bone) => !bone.name.includes('_end_') && SECONDARY_PATTERN.test(bone.name)
+  );
+  secondary.forEach(capture);
+
+  return { bases, secondary };
+}
+
+const localRotate = (bases: PoseSet, name: string, x: number, y: number, z: number) => {
+  const base = bases[name];
+  if (!base) return;
+  base.quaternion.multiply(
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, 'XYZ'))
+  );
+};
+
+const localSwing = (bases: PoseSet, name: string, angle: number) => {
+  const base = bases[name];
+  if (!base) return;
+  base.quaternion.multiply(
+    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle)
+  );
+};
+
+/** Relaxed A-pose: arms down, slightly outward and forward. */
+function applyRelaxedPose(bases: PoseSet) {
+  localRotate(bases, 'J_Bip_L_UpperArm', -1.20, 0.15, 0.20);
+  localRotate(bases, 'J_Bip_R_UpperArm', -1.20, -0.15, -0.20);
+  localRotate(bases, 'J_Bip_L_LowerArm', -0.10, 0, 0.10);
+  localRotate(bases, 'J_Bip_R_LowerArm', -0.10, 0, -0.10);
+  localRotate(bases, 'J_Bip_L_Hand', 0, 0, 0.04);
+  localRotate(bases, 'J_Bip_R_Hand', 0, 0, -0.04);
+  // Final local swing pulls the hands forward, next to the skirt.
+  localSwing(bases, 'J_Bip_L_UpperArm', -0.30);
+  localSwing(bases, 'J_Bip_R_UpperArm', 0.30);
+}
+
+/**
+ * Timid pose: shoulders slightly rounded, head dipped and tilted, hands
+ * clasped in front of the waist, knees close together.
+ */
+function applyShyPose(bases: PoseSet) {
+  localRotate(bases, 'J_Bip_C_Spine', 0.08, 0, 0);
+  localRotate(bases, 'J_Bip_C_Chest', 0.06, 0, 0);
+  localRotate(bases, 'J_Bip_C_Neck', 0.05, 0, 0.02);
+  localRotate(bases, 'J_Bip_C_Head', 0.10, 0.06, 0.12);
+
+  // Rounded shoulders, pulled a touch forward.
+  localRotate(bases, 'J_Bip_L_Shoulder', 0.03, 0, -0.05);
+  localRotate(bases, 'J_Bip_R_Shoulder', -0.03, 0, 0.05);
+
+  // Elbows bent so both hands meet in front of the belly.
+  localRotate(bases, 'J_Bip_L_UpperArm', -0.50, 0, -0.25);
+  localRotate(bases, 'J_Bip_R_UpperArm', -0.50, 0, 0.25);
+  localRotate(bases, 'J_Bip_L_LowerArm', 0, 0, -0.62);
+  localRotate(bases, 'J_Bip_R_LowerArm', 0, 0, 0.62);
+
+  // Knees and feet turned slightly inward.
+  localRotate(bases, 'J_Bip_L_UpperLeg', 0, 0.02, -0.03);
+  localRotate(bases, 'J_Bip_R_UpperLeg', 0, -0.02, 0.03);
+  localRotate(bases, 'J_Bip_L_Foot', 0, 0.03, 0);
+  localRotate(bases, 'J_Bip_R_Foot', 0, -0.03, 0);
+}
+
+function sampleClip(
+  bases: PoseSet,
+  motions: Record<string, Motion>,
+  name: string,
+  duration: number
+): THREE.AnimationClip {
+  const frameCount = Math.round(duration * SAMPLE_FPS);
+  const times = new Float32Array(frameCount + 1);
+  for (let frame = 0; frame <= frameCount; frame++) {
+    times[frame] = frame / SAMPLE_FPS;
+  }
+
+  const tracks: THREE.KeyframeTrack[] = [];
+  const euler = new THREE.Euler(0, 0, 0, 'XYZ');
+  const offsetQuaternion = new THREE.Quaternion();
+
+  for (const [boneName, base] of Object.entries(bases)) {
+    const motion = motions[boneName];
+    if (!motion) continue;
+
+    const quaternionValues = new Float32Array((frameCount + 1) * 4);
+    const positionValues =
+      motion.px || motion.py || motion.pz ? new Float32Array((frameCount + 1) * 3) : null;
+
+    for (let frame = 0; frame <= frameCount; frame++) {
+      const t = times[frame];
+      const rx = motion.rx ? motion.rx(t) : 0;
+      const ry = motion.ry ? motion.ry(t) : 0;
+      const rz = motion.rz ? motion.rz(t) : 0;
+
+      // Compose the breathing/sway offset in the bone's local space.
+      euler.set(rx, ry, rz, 'XYZ');
+      offsetQuaternion.setFromEuler(euler);
+      const q = base.quaternion.clone().multiply(offsetQuaternion);
+      q.toArray(quaternionValues, frame * 4);
+
+      if (positionValues) {
+        positionValues[frame * 3] = base.position.x + (motion.px ? motion.px(t) : 0);
+        positionValues[frame * 3 + 1] = base.position.y + (motion.py ? motion.py(t) : 0);
+        positionValues[frame * 3 + 2] = base.position.z + (motion.pz ? motion.pz(t) : 0);
+      }
+    }
+
+    tracks.push(
+      new THREE.QuaternionKeyframeTrack(
+        `${base.bone.name}.quaternion`,
+        Array.from(times),
+        Array.from(quaternionValues)
+      )
     );
-  };
 
-  relaxed('J_Bip_L_UpperArm', -1.20, 0.15, 0.20);
-  relaxed('J_Bip_R_UpperArm', -1.20, -0.15, -0.20);
-  relaxed('J_Bip_L_LowerArm', -0.10, 0, 0.10);
-  relaxed('J_Bip_R_LowerArm', -0.10, 0, -0.10);
-  relaxed('J_Bip_L_Hand', 0, 0, 0.04);
-  relaxed('J_Bip_R_Hand', 0, 0, -0.04);
-  swingForward('J_Bip_L_UpperArm', -0.30);
-  swingForward('J_Bip_R_UpperArm', 0.30);
+    if (positionValues) {
+      tracks.push(
+        new THREE.VectorKeyframeTrack(
+          `${base.bone.name}.position`,
+          Array.from(times),
+          Array.from(positionValues)
+        )
+      );
+    }
+  }
 
+  const clip = new THREE.AnimationClip(name, duration, tracks);
+  clip.optimize();
+  return clip;
+}
+
+function addSecondaryMotions(
+  motions: Record<string, Motion>,
+  secondary: THREE.Bone[],
+  duration: number,
+  scale = 1
+) {
+  secondary.forEach((bone, index) => {
+    const phase = index * 0.37;
+    const isHair = /Hair/.test(bone.name);
+    const isSleeve = /Sleeve/.test(bone.name);
+    const amplitude = (isHair ? 0.018 : isSleeve ? 0.010 : 0.020) * scale;
+
+    motions[bone.name] = {
+      rx: (t) => amplitude * Math.sin((TAU * t) / duration + phase),
+      rz: (t) => amplitude * 0.8 * Math.sin((TAU * t) / duration + phase + 0.65),
+    };
+  });
+}
+
+function buildIdleMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   const breath = (t: number) => Math.sin((TAU * t) / 3);
   const sway = (t: number) => Math.sin((TAU * t) / IDLE_DURATION);
   const swayHarmonic = (t: number, phase = 0) =>
@@ -202,71 +320,88 @@ export function createIdleAnimationClip(root: THREE.Object3D): THREE.AnimationCl
     },
   };
 
-  // Soft follow-through on hair, skirt and sleeves.
-  secondaryBones.forEach((bone, index) => {
-    const phase = index * 0.37;
-    const isHair = /Hair/.test(bone.name);
-    const isSleeve = /Sleeve/.test(bone.name);
-    const amplitude = isHair ? 0.018 : isSleeve ? 0.010 : 0.020;
+  addSecondaryMotions(motions, secondary, IDLE_DURATION);
+  return motions;
+}
 
-    motions[bone.name] = {
-      rx: (t) => amplitude * Math.sin((TAU * t) / IDLE_DURATION + phase),
-      rz: (t) => amplitude * 0.8 * Math.sin((TAU * t) / IDLE_DURATION + phase + 0.65),
-    };
-  });
+function buildShyMotions(secondary: THREE.Bone[]): Record<string, Motion> {
+  const breath = (t: number) => Math.sin((TAU * t) / 2.8);
+  const sway = (t: number) => Math.sin((TAU * t) / SHY_DURATION);
+  const glance = (t: number) => Math.sin((TAU * t) / SHY_DURATION + 1.1);
 
-  const frameCount = Math.round(IDLE_DURATION * SAMPLE_FPS);
-  const times = new Float32Array(frameCount + 1);
-  for (let frame = 0; frame <= frameCount; frame++) {
-    times[frame] = frame / SAMPLE_FPS;
-  }
+  const motions: Record<string, Motion> = {
+    J_Bip_C_Hips: {
+      rx: (t) => 0.004 * breath(t + 0.2),
+      rz: (t) => 0.008 * sway(t),
+      py: (t) => 0.002 * breath(t),
+    },
+    J_Bip_C_Spine: {
+      rx: (t) => 0.004 * breath(t),
+      rz: (t) => 0.004 * sway(t + 0.3),
+    },
+    J_Bip_C_Chest: {
+      rx: (t) => 0.005 * breath(t + 0.1),
+    },
+    J_Bip_C_Neck: {
+      rx: (t) => 0.004 * Math.sin((TAU * t) / 2.8 + 0.4),
+      rz: (t) => 0.005 * sway(t + 0.5),
+    },
+    J_Bip_C_Head: {
+      rx: (t) => 0.008 * Math.sin((TAU * t) / 2.8 + 0.8),
+      ry: (t) => 0.020 * glance(t),
+      rz: (t) => 0.012 * sway(t + 0.6),
+    },
+    J_Bip_L_Shoulder: {
+      rx: (t) => 0.004 * breath(t + 0.3),
+      rz: (t) => 0.004 * sway(t + 0.2),
+    },
+    J_Bip_R_Shoulder: {
+      rx: (t) => 0.004 * breath(t + 0.3),
+      rz: (t) => -0.004 * sway(t + 0.2),
+    },
+    J_Bip_L_UpperArm: {
+      rx: (t) => 0.010 * sway(t + 0.7),
+      rz: (t) => 0.010 * breath(t + 0.4),
+    },
+    J_Bip_R_UpperArm: {
+      rx: (t) => 0.010 * sway(t + 0.7),
+      rz: (t) => -0.010 * breath(t + 0.4),
+    },
+    J_Bip_L_LowerArm: {
+      rz: (t) => -0.016 * sway(t + 1.0),
+    },
+    J_Bip_R_LowerArm: {
+      rz: (t) => 0.016 * sway(t + 1.0),
+    },
+    J_Bip_L_Hand: {
+      rx: (t) => 0.010 * sway(t + 1.3),
+    },
+    J_Bip_R_Hand: {
+      rx: (t) => 0.010 * sway(t + 1.3),
+    },
+    J_Bip_L_UpperLeg: {
+      rz: (t) => 0.005 * sway(t + 0.2),
+    },
+    J_Bip_R_UpperLeg: {
+      rz: (t) => -0.005 * sway(t + 0.2),
+    },
+  };
 
-  const tracks: THREE.KeyframeTrack[] = [];
-  const euler = new THREE.Euler(0, 0, 0, 'XYZ');
-  const offsetQuaternion = new THREE.Quaternion();
+  addSecondaryMotions(motions, secondary, SHY_DURATION, 0.6);
+  return motions;
+}
 
-  for (const [name, base] of Object.entries(bases)) {
-    const motion = motions[name];
-    if (!motion) continue;
+/** Soft, looping anime idle used most of the time. */
+export function createIdleAnimationClip(root: THREE.Object3D): THREE.AnimationClip {
+  const { bases, secondary } = collectPose(root);
+  applyRelaxedPose(bases);
+  return sampleClip(bases, buildIdleMotions(secondary), 'florie_gentle_idle', IDLE_DURATION);
+}
 
-    const quaternionValues = new Float32Array((frameCount + 1) * 4);
-    const positionValues =
-      motion.px || motion.py || motion.pz
-        ? new Float32Array((frameCount + 1) * 3)
-        : null;
-
-    for (let frame = 0; frame <= frameCount; frame++) {
-      const t = times[frame];
-      const rx = motion.rx ? motion.rx(t) : 0;
-      const ry = motion.ry ? motion.ry(t) : 0;
-      const rz = motion.rz ? motion.rz(t) : 0;
-
-      // Compose the breathing/sway offset in the bone's local space and
-      // sample it into a keyframe track.
-      euler.set(rx, ry, rz, 'XYZ');
-      offsetQuaternion.setFromEuler(euler);
-      const q = base.quaternion.clone().multiply(offsetQuaternion);
-      q.toArray(quaternionValues, frame * 4);
-
-      if (positionValues) {
-        positionValues[frame * 3] = base.position.x + (motion.px ? motion.px(t) : 0);
-        positionValues[frame * 3 + 1] = base.position.y + (motion.py ? motion.py(t) : 0);
-        positionValues[frame * 3 + 2] = base.position.z + (motion.pz ? motion.pz(t) : 0);
-      }
-    }
-
-    tracks.push(
-      new THREE.QuaternionKeyframeTrack(`${base.bone.name}.quaternion`, Array.from(times), Array.from(quaternionValues))
-    );
-
-    if (positionValues) {
-      tracks.push(
-        new THREE.VectorKeyframeTrack(`${base.bone.name}.position`, Array.from(times), Array.from(positionValues))
-      );
-    }
-  }
-
-  const clip = new THREE.AnimationClip('florie_gentle_idle', IDLE_DURATION, tracks);
-  clip.optimize();
-  return clip;
+/** Timid idle played randomly when Florie has been standing still. */
+export function createShyIdleAnimationClip(root: THREE.Object3D): THREE.AnimationClip {
+  const { bases, secondary } = collectPose(root);
+  applyRelaxedPose(bases);
+  applyShyPose(bases);
+  return sampleClip(bases, buildShyMotions(secondary), 'florie_shy_idle', SHY_DURATION);
 }
