@@ -6,9 +6,52 @@ import {
   addHandMotions,
   TAU,
   Motion,
+  PoseSet,
 } from './idleAnimation';
 
 export const WALK_DURATION = 1.0;
+
+/** The model's side axis (its left-right line). Rotating about it swings a limb forward or back. */
+const SIDE_AXIS = new THREE.Vector3(1, 0, 0);
+
+/** Orientation of a bone in the model's frame at rest, using the relaxed pose where it is known. */
+function restQuaternion(bone: THREE.Object3D, root: THREE.Object3D, bases: PoseSet): THREE.Quaternion {
+  const chain: THREE.Object3D[] = [];
+  for (let node: THREE.Object3D | null = bone; node && node !== root; node = node.parent) chain.push(node);
+  const q = new THREE.Quaternion();
+  for (let i = chain.length - 1; i >= 0; i--) {
+    q.multiply(bases[chain[i].name]?.quaternion ?? chain[i].quaternion);
+  }
+  return q;
+}
+
+/**
+ * A motion that rotates a bone about the model's side axis, so it swings strictly forward and back
+ * whatever the bone's own local axes are. `angle` is in radians, positive = limb swings backward.
+ * (The clip composes offsets as `base * euler`, so the offset is the side axis expressed in the bone's frame.)
+ */
+function sagittalMotion(
+  bases: PoseSet,
+  root: THREE.Object3D,
+  boneName: string,
+  angle: (t: number) => number
+): Motion {
+  const base = bases[boneName];
+  if (!base) return {};
+  const axis = SIDE_AXIS.clone().applyQuaternion(restQuaternion(base.bone, root, bases).invert());
+  const quat = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  let lastT = NaN;
+  const at = (t: number) => {
+    if (t !== lastT) {
+      quat.setFromAxisAngle(axis, angle(t));
+      euler.setFromQuaternion(quat, 'XYZ');
+      lastT = t;
+    }
+    return euler;
+  };
+  return { rx: (t) => at(t).x, ry: (t) => at(t).y, rz: (t) => at(t).z };
+}
 
 /**
  * Procedural anime walk cycle for Florie:
@@ -18,7 +61,11 @@ export const WALK_DURATION = 1.0;
  * - Relaxed anime arm swing with soft elbow flex and wrist follow-through
  * - Trailing secondary motion for hair, skirt, and sleeve cuffs
  */
-function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
+function buildWalkMotions(
+  secondary: THREE.Bone[],
+  bases: PoseSet,
+  root: THREE.Object3D
+): Record<string, Motion> {
   const phi = (t: number) => (TAU * t) / WALK_DURATION;
 
   // Asymmetric smooth knee flex curve:
@@ -99,41 +146,17 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
       rx: (t) => 0.015 * Math.sin(phi(t) - 0.05),
     },
 
-    // --- Arms (pure front-and-back sagittal swing, zero left-to-right drift) ---
-    J_Bip_L_UpperArm: {
-      rx: (t) => 0.976 * armPitchL(t),
-      ry: (t) => 0.010 * armPitchL(t),
-      rz: (t) => -0.04 + 0.219 * armPitchL(t),
-    },
-    J_Bip_R_UpperArm: {
-      rx: (t) => 0.976 * armPitchR(t),
-      ry: (t) => -0.010 * armPitchR(t),
-      rz: (t) => 0.04 - 0.219 * armPitchR(t),
-    },
+    // --- Arms: pure front-and-back swing about the model's side axis (no left-right drift) ---
+    J_Bip_L_UpperArm: sagittalMotion(bases, root, 'J_Bip_L_UpperArm', armPitchL),
+    J_Bip_R_UpperArm: sagittalMotion(bases, root, 'J_Bip_R_UpperArm', armPitchR),
 
-    // --- Elbows / Forearms (pure sagittal hinge flexion, zero sideways wobble) ---
-    J_Bip_L_LowerArm: {
-      rx: (t) => 0.970 * elbowPitchL(t),
-      ry: (t) => -0.110 * elbowPitchL(t),
-      rz: (t) => 0.219 * elbowPitchL(t),
-    },
-    J_Bip_R_LowerArm: {
-      rx: (t) => 0.970 * elbowPitchR(t),
-      ry: (t) => 0.110 * elbowPitchR(t),
-      rz: (t) => -0.219 * elbowPitchR(t),
-    },
+    // --- Elbows: soft forward hinge flex (same curve as before, flexing the hand forward) ---
+    J_Bip_L_LowerArm: sagittalMotion(bases, root, 'J_Bip_L_LowerArm', (t) => -elbowPitchL(t)),
+    J_Bip_R_LowerArm: sagittalMotion(bases, root, 'J_Bip_R_LowerArm', (t) => -elbowPitchR(t)),
 
-    // --- Wrists / Hands (pure sagittal trailing wave, zero sideways flutter) ---
-    J_Bip_L_Hand: {
-      rx: (t) => 0.964 * wristPitchL(t),
-      ry: (t) => -0.148 * wristPitchL(t),
-      rz: (t) => 0.219 * wristPitchL(t),
-    },
-    J_Bip_R_Hand: {
-      rx: (t) => 0.964 * wristPitchR(t),
-      ry: (t) => 0.148 * wristPitchR(t),
-      rz: (t) => -0.219 * wristPitchR(t),
-    },
+    // --- Wrists: soft trailing wave following the forearm ---
+    J_Bip_L_Hand: sagittalMotion(bases, root, 'J_Bip_L_Hand', wristPitchL),
+    J_Bip_R_Hand: sagittalMotion(bases, root, 'J_Bip_R_Hand', wristPitchR),
 
     // --- Legs (Thighs, Knees, Feet) ---
     J_Bip_L_UpperLeg: {
@@ -228,5 +251,5 @@ function addWalkSecondaryMotions(
 export function createWalkAnimationClip(root: THREE.Object3D): THREE.AnimationClip {
   const { bases, secondary } = collectPose(root);
   applyRelaxedPose(bases);
-  return sampleClip(bases, buildWalkMotions(secondary), 'florie_anime_walk', WALK_DURATION);
+  return sampleClip(bases, buildWalkMotions(secondary, bases, root), 'florie_anime_walk', WALK_DURATION);
 }
