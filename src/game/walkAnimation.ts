@@ -67,8 +67,10 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   const armSwingR = (t: number) => armAmp * Math.sin(phi(t) - 0.10);
 
   // Elbow flexes when the arm swings forward, extends on the backswing.
-  const elbowFlexL = (t: number) => 0.16 - 0.18 * Math.sin(phi(t) - 0.35);
-  const elbowFlexR = (t: number) => 0.16 - 0.18 * Math.sin(phi(t) - 0.35);
+  const fwdEnvL = (t: number) => { const s = -Math.sin(phi(t) - 0.35); return s > 0 ? s * s : 0; };
+  const fwdEnvR = (t: number) => { const s = Math.sin(phi(t) - 0.35); return s > 0 ? s * s : 0; };
+  const elbowPitchL = (t: number) => 0.16 + 0.18 * fwdEnvL(t);
+  const elbowPitchR = (t: number) => 0.16 - 0.18 * fwdEnvR(t);
 
   // Wrist trails the forearm (follow-through).
   const wristTrailL = (t: number) => -0.22 * Math.sin(phi(t) - 0.65);
@@ -140,10 +142,10 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
 
     // --- Elbows / Forearms (gentle flex on forward swing) ---
     J_Bip_L_LowerArm: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_LOWER_L, elbowFlexL(t)),
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_LOWER_L, elbowPitchL(t)),
     },
     J_Bip_R_LowerArm: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_LOWER_R, elbowFlexR(t)),
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_LOWER_R, elbowPitchR(t)),
     },
 
     // --- Wrists / Hands (trailing follow-through) ---
