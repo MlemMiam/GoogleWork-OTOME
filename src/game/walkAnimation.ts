@@ -187,15 +187,26 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
 }
 
 function addWalkFingerMotions(motions: Record<string, Motion>) {
-  // Fingers are held in their relaxed pose during the walk (no curl motion).
+  // Fingers rest in a soft, slightly curled pose toward the palm so the
+  // hands look natural instead of stiff flat paddles. Curl is static
+  // (no wobble) and slightly stronger on the outer segments.
   for (const side of ['L', 'R']) {
+    const isLeft = side === 'L';
     for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
       for (const segment of [1, 2, 3]) {
-        motions[`J_Bip_${side}_${finger}${segment}`] = {};
+        const curl = 0.05 + 0.03 * segment;
+        motions[`J_Bip_${side}_${finger}${segment}`] = {
+          rx: () => -curl,
+        };
       }
     }
-    motions[`J_Bip_${side}_Thumb1`] = {};
-    motions[`J_Bip_${side}_Thumb2`] = {};
+    // Thumbs curl softly toward the fingers.
+    motions[`J_Bip_${side}_Thumb1`] = {
+      rz: () => (isLeft ? 0.25 : -0.25),
+    };
+    motions[`J_Bip_${side}_Thumb2`] = {
+      rz: () => (isLeft ? 0.10 : -0.10),
+    };
   }
 }
 
