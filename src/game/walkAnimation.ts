@@ -194,7 +194,7 @@ function addWalkFingerMotions(motions: Record<string, Motion>) {
     const isLeft = side === 'L';
     for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
       for (const segment of [1, 2, 3]) {
-        const curl = 0.05 + 0.03 * segment;
+        const curl = 0.09 + 0.05 * segment;
         motions[`J_Bip_${side}_${finger}${segment}`] = {
           rx: () => -curl,
         };
@@ -202,10 +202,10 @@ function addWalkFingerMotions(motions: Record<string, Motion>) {
     }
     // Thumbs curl softly toward the fingers.
     motions[`J_Bip_${side}_Thumb1`] = {
-      rz: () => (isLeft ? 0.25 : -0.25),
+      rz: () => (isLeft ? 0.32 : -0.32),
     };
     motions[`J_Bip_${side}_Thumb2`] = {
-      rz: () => (isLeft ? 0.10 : -0.10),
+      rz: () => (isLeft ? 0.14 : -0.14),
     };
   }
 }
