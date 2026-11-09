@@ -254,7 +254,6 @@ function addWalkSecondaryMotions(
       const axis = isLeft
         ? (isLower ? PITCH_SLEEVE_LOWER_L : PITCH_SLEEVE_TIP_L)
         : (isLower ? PITCH_SLEEVE_LOWER_R : PITCH_SLEEVE_TIP_R);
-      const sign = isLeft ? 1 : -1;
       const angleFn = (t: number) => { const s = Math.sin(phi(t) - 0.50 - stagger); const env = isLeft ? (s < 0 ? s * s : 0) : (s > 0 ? s * s : 0); return isLeft ? -0.18 * env : 0.18 * env; };
       motions[bone.name] = {
         quat: (t: number) => new THREE.Quaternion().setFromAxisAngle(axis, angleFn(t)),
