@@ -16,6 +16,8 @@ export type Motion = {
   rx?: (t: number) => number;
   ry?: (t: number) => number;
   rz?: (t: number) => number;
+  /** Direct quaternion offset applied in local space, takes precedence over Euler rx/ry/rz if provided. */
+  quat?: (t: number) => THREE.Quaternion;
   /** Position offset in meters, applied in the bone's local space. */
   px?: (t: number) => number;
   py?: (t: number) => number;
@@ -129,7 +131,7 @@ const localSwing = (bases: PoseSet, name: string, angle: number) => {
   );
 };
 
-/** Relaxed A-pose: arms down, slightly outward and forward. */
+/** Relaxed A-pose: arms down, slightly outward and forward, clearing the dress. */
 export function applyRelaxedPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_L_UpperArm', -1.20, 0.15, 0.20);
   localRotate(bases, 'J_Bip_R_UpperArm', -1.20, -0.15, -0.20);
@@ -137,7 +139,7 @@ export function applyRelaxedPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_R_LowerArm', -0.10, 0, -0.10);
   localRotate(bases, 'J_Bip_L_Hand', 0, 0, 0.04);
   localRotate(bases, 'J_Bip_R_Hand', 0, 0, -0.04);
-  // Final local swing pulls the hands forward, next to the skirt.
+  // Final local swing pulls the hands forward, next to the skirt without clipping.
   localSwing(bases, 'J_Bip_L_UpperArm', -0.30);
   localSwing(bases, 'J_Bip_R_UpperArm', 0.30);
 }
@@ -226,15 +228,22 @@ export function sampleClip(
 
     for (let frame = 0; frame <= frameCount; frame++) {
       const t = times[frame];
-      const rx = motion.rx ? motion.rx(t) : 0;
-      const ry = motion.ry ? motion.ry(t) : 0;
-      const rz = motion.rz ? motion.rz(t) : 0;
 
-      // Compose the breathing/sway offset in the bone's local space.
-      euler.set(rx, ry, rz, 'XYZ');
-      offsetQuaternion.setFromEuler(euler);
-      const q = base.quaternion.clone().multiply(offsetQuaternion);
-      q.toArray(quaternionValues, frame * 4);
+      if (motion.quat) {
+        const offsetQ = motion.quat(t);
+        const q = base.quaternion.clone().multiply(offsetQ);
+        q.toArray(quaternionValues, frame * 4);
+      } else {
+        const rx = motion.rx ? motion.rx(t) : 0;
+        const ry = motion.ry ? motion.ry(t) : 0;
+        const rz = motion.rz ? motion.rz(t) : 0;
+
+        // Compose the breathing/sway offset in the bone's local space.
+        euler.set(rx, ry, rz, 'XYZ');
+        offsetQuaternion.setFromEuler(euler);
+        const q = base.quaternion.clone().multiply(offsetQuaternion);
+        q.toArray(quaternionValues, frame * 4);
+      }
 
       if (positionValues) {
         positionValues[frame * 3] = base.position.x + (motion.px ? motion.px(t) : 0);

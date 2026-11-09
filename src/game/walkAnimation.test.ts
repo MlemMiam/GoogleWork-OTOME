@@ -88,3 +88,28 @@ test('walkAnimation: seamless loop continuity (start matches end)', () => {
     }
   });
 });
+
+test('walkAnimation: arm tracks have normalized valid quaternions at every keyframe', () => {
+  const root = createMockFlorieSkeleton();
+  const clip = createWalkAnimationClip(root);
+
+  const armTracks = clip.tracks.filter((t) =>
+    ['J_Bip_L_UpperArm.quaternion', 'J_Bip_R_UpperArm.quaternion',
+     'J_Bip_L_LowerArm.quaternion', 'J_Bip_R_LowerArm.quaternion',
+     'J_Bip_L_Hand.quaternion', 'J_Bip_R_Hand.quaternion'].includes(t.name)
+  );
+
+  assert.equal(armTracks.length, 6, 'must contain all 6 arm joint tracks');
+
+  armTracks.forEach((track) => {
+    const vals = track.values;
+    for (let i = 0; i < vals.length; i += 4) {
+      const lenSq = vals[i]**2 + vals[i+1]**2 + vals[i+2]**2 + vals[i+3]**2;
+      assert.ok(
+        Math.abs(lenSq - 1.0) < 1e-3,
+        `Quaternion in track ${track.name} at frame ${i/4} must be unit length (got lenSq=${lenSq})`
+      );
+    }
+  });
+});
+
