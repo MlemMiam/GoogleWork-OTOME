@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 
-const TAU = Math.PI * 2;
-const IDLE_DURATION = 6;
-const SHY_DURATION = 5;
-const SAMPLE_FPS = 30;
+export const TAU = Math.PI * 2;
+export const IDLE_DURATION = 6;
+export const SHY_DURATION = 5;
+export const SAMPLE_FPS = 30;
 
-type BoneBase = {
+export type BoneBase = {
   bone: THREE.Bone;
   quaternion: THREE.Quaternion;
   position: THREE.Vector3;
 };
 
-type Motion = {
+export type Motion = {
   /** Rotation offsets in radians, applied in the bone's local space. */
   rx?: (t: number) => number;
   ry?: (t: number) => number;
@@ -22,7 +22,7 @@ type Motion = {
   pz?: (t: number) => number;
 };
 
-type PoseSet = Record<string, BoneBase>;
+export type PoseSet = Record<string, BoneBase>;
 
 const CORE_BONES = [
   'J_Bip_C_Hips',
@@ -83,7 +83,7 @@ const SECONDARY_PATTERN =
  * pose is used as a base, so every generated clip starts from the same
  * skeleton state and can be blended safely.
  */
-function collectPose(root: THREE.Object3D): { bases: PoseSet; secondary: THREE.Bone[] } {
+export function collectPose(root: THREE.Object3D): { bases: PoseSet; secondary: THREE.Bone[] } {
   const bones: Record<string, THREE.Bone> = {};
   root.traverse((object) => {
     if ((object as THREE.Bone).isBone && !object.name.toLowerCase().includes('collider')) {
@@ -130,7 +130,7 @@ const localSwing = (bases: PoseSet, name: string, angle: number) => {
 };
 
 /** Relaxed A-pose: arms down, slightly outward and forward. */
-function applyRelaxedPose(bases: PoseSet) {
+export function applyRelaxedPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_L_UpperArm', -1.20, 0.15, 0.20);
   localRotate(bases, 'J_Bip_R_UpperArm', -1.20, -0.15, -0.20);
   localRotate(bases, 'J_Bip_L_LowerArm', -0.10, 0, 0.10);
@@ -200,7 +200,7 @@ function applyShyPose(bases: PoseSet) {
   localRotate(bases, 'J_Bip_R_Foot', 0, -0.03, 0);
 }
 
-function sampleClip(
+export function sampleClip(
   bases: PoseSet,
   motions: Record<string, Motion>,
   name: string,
@@ -209,7 +209,7 @@ function sampleClip(
   const frameCount = Math.round(duration * SAMPLE_FPS);
   const times = new Float32Array(frameCount + 1);
   for (let frame = 0; frame <= frameCount; frame++) {
-    times[frame] = frame / SAMPLE_FPS;
+    times[frame] = (frame / frameCount) * duration;
   }
 
   const tracks: THREE.KeyframeTrack[] = [];
@@ -291,7 +291,7 @@ function addSecondaryMotions(
  * track in both clips: without one, the mixer leaves them stuck in the shy
  * pose after the blend back to the gentle idle.
  */
-function addHandMotions(motions: Record<string, Motion>) {
+export function addHandMotions(motions: Record<string, Motion>) {
   const names = [
     'J_Bip_L_Thumb1',
     'J_Bip_L_Thumb2',
@@ -489,3 +489,6 @@ export function createShyIdleAnimationClip(root: THREE.Object3D): THREE.Animatio
   applyShyPose(bases);
   return sampleClip(bases, buildShyMotions(secondary), 'florie_shy_idle', SHY_DURATION);
 }
+
+export { createWalkAnimationClip } from './walkAnimation';
+
