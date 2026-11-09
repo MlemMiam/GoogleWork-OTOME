@@ -58,27 +58,8 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     return 0.16 * Math.sin(p - 1.6) - 0.06 * Math.sin(2 * (p - 1.6));
   };
 
-  // Arm swing: smooth contralateral (opposite arm & leg) pendulum using a
-  // single frequency (no double-bounce) for a clean, wobble-free anime gait.
-  // Every joint (shoulder, upper arm, elbow, wrist, fingers) participates with
-  // progressive lags so the arm feels supple, fluid and cartoon-natural.
-  const armAmp = 0.60;
-  const armSwingL = (t: number) => -armAmp * Math.sin(phi(t) - 0.10);
-  const armSwingR = (t: number) => armAmp * Math.sin(phi(t) - 0.10);
-
-  // Elbow flexes when the arm swings forward, extends on the backswing.
-  const fwdEnvL = (t: number) => { const s = -Math.sin(phi(t) - 0.35); return s > 0 ? s * s : 0; };
-  const fwdEnvR = (t: number) => { const s = Math.sin(phi(t) - 0.35); return s > 0 ? s * s : 0; };
-  const elbowPitchL = (t: number) => 0.08 + 0.06 * fwdEnvL(t);
-  const elbowPitchR = (t: number) => 0.08 - 0.06 * fwdEnvR(t);
-
-  // Wrist trails the forearm (follow-through).
-  const wristTrailL = (t: number) => -0.06 * Math.sin(phi(t) - 0.65);
-  const wristTrailR = (t: number) => 0.06 * Math.sin(phi(t) - 0.65);
-
-  // Shoulder roll follows the arm swing.
-  const shoulderRollL = (t: number) => -0.08 * Math.sin(phi(t) - 0.05);
-  const shoulderRollR = (t: number) => 0.08 * Math.sin(phi(t) - 0.05);
+  // Arms are intentionally left unanimated during the walk: they keep the
+  // relaxed pose defined in applyRelaxedPose (no swing, no curve, no wobble).
 
   const motions: Record<string, Motion> = {
     // --- Pelvis / Hips ---
@@ -122,39 +103,17 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
       rz: (t) => 0.007 * Math.sin(phi(t) + 0.35),
     },
 
-    // --- Shoulders (fluid clavicle roll following the arm swing) ---
-    J_Bip_L_Shoulder: {
-      rx: (t) => 0.006 * Math.cos(2 * phi(t)),
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_L, shoulderRollL(t)),
-    },
-    J_Bip_R_Shoulder: {
-      rx: (t) => 0.006 * Math.cos(2 * phi(t)),
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_R, shoulderRollR(t)),
-    },
+    // --- Shoulders (held in relaxed pose, no animation) ---
+    J_Bip_L_Shoulder: {},
+    J_Bip_R_Shoulder: {},
 
-    // --- Arms (smooth contralateral swing, zero lateral drift, zero twist) ---
-    J_Bip_L_UpperArm: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_L, armSwingL(t)),
-    },
-    J_Bip_R_UpperArm: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_R, armSwingR(t)),
-    },
-
-    // --- Elbows / Forearms (gentle flex on forward swing) ---
-    J_Bip_L_LowerArm: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_LOWER_L, elbowPitchL(t)),
-    },
-    J_Bip_R_LowerArm: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_LOWER_R, elbowPitchR(t)),
-    },
-
-    // --- Wrists / Hands (trailing follow-through) ---
-    J_Bip_L_Hand: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_HAND_L, wristTrailL(t)),
-    },
-    J_Bip_R_Hand: {
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_HAND_R, wristTrailR(t)),
-    },
+    // --- Arms / Elbows / Wrists / Hands (held in relaxed pose, no animation) ---
+    J_Bip_L_UpperArm: {},
+    J_Bip_R_UpperArm: {},
+    J_Bip_L_LowerArm: {},
+    J_Bip_R_LowerArm: {},
+    J_Bip_L_Hand: {},
+    J_Bip_R_Hand: {},
 
     // --- Legs (Thighs, Knees, Feet) ---
     J_Bip_L_UpperLeg: {
@@ -193,23 +152,15 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
 }
 
 function addWalkFingerMotions(motions: Record<string, Motion>) {
-  const phi = (t: number) => (TAU * t) / WALK_DURATION;
+  // Fingers are held in their relaxed pose during the walk (no curl motion).
   for (const side of ['L', 'R']) {
-    const isLeft = side === 'L';
     for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
       for (const segment of [1, 2, 3]) {
-        motions[`J_Bip_${side}_${finger}${segment}`] = {
-          rx: (t) => -0.05 * segment *
-            (0.5 + 0.5 * (isLeft ? -Math.sin(phi(t) - 0.8) : Math.sin(phi(t) - 0.8))),
-        };
+        motions[`J_Bip_${side}_${finger}${segment}`] = {};
       }
     }
-    motions[`J_Bip_${side}_Thumb1`] = {
-      rz: (t) => (isLeft ? -0.06 : 0.06) * Math.sin(phi(t) - 0.9),
-    };
-    motions[`J_Bip_${side}_Thumb2`] = {
-      rz: (t) => (isLeft ? -0.03 : 0.03) * Math.sin(phi(t) - 0.9),
-    };
+    motions[`J_Bip_${side}_Thumb1`] = {};
+    motions[`J_Bip_${side}_Thumb2`] = {};
   }
 }
 
@@ -254,17 +205,8 @@ function addWalkSecondaryMotions(
         };
       }
     } else if (isSleeve) {
-      const isLeft = isLeftSleeve;
-      const isLower = /LowerSleeve/.test(bone.name);
-      const axis = isLeft
-        ? (isLower ? PITCH_SLEEVE_LOWER_L : PITCH_SLEEVE_TIP_L)
-        : (isLower ? PITCH_SLEEVE_LOWER_R : PITCH_SLEEVE_TIP_R);
-      const sign = isLeft ? 1 : -1;
-      motions[bone.name] = {
-        quat: (t: number) => new THREE.Quaternion().setFromAxisAngle(
-          axis, sign * 0.18 * Math.sin(phi(t) - 0.50 - stagger)
-        ),
-      };
+      // Sleeves are held in their relaxed pose during the walk (no arm swing).
+      motions[bone.name] = {};
     }
   });
 }
