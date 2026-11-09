@@ -970,6 +970,12 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         glbMixer.update(dt);
       }
 
+      // The idle clip no longer drives the legs, so nothing resets them after a walk.
+      // Start every frame from the bind pose; the walk blend below slerps from there.
+      for (const key of ['_lLeg', '_rLeg', '_lKnee', '_rKnee']) {
+        if (boneMap[key] && initialQuat[key]) boneMap[key].quaternion.copy(initialQuat[key]);
+      }
+
       if (walkWeight > 0.02) {
         // Blend walk cycle on legs
         if (boneMap._lLeg && initialQuat._lLeg) {
