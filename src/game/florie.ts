@@ -842,6 +842,22 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
             boneMap._spine = bone;
             initialQuat._spine = bone.quaternion.clone();
           }
+          if (n === 'J_Bip_C_Chest') {
+            boneMap._chest = bone;
+            initialQuat._chest = bone.quaternion.clone();
+          }
+          if (n === 'J_Bip_C_UpperChest') {
+            boneMap._upperChest = bone;
+            initialQuat._upperChest = bone.quaternion.clone();
+          }
+          if (n === 'J_Bip_L_Shoulder') {
+            boneMap._lShoulder = bone;
+            initialQuat._lShoulder = bone.quaternion.clone();
+          }
+          if (n === 'J_Bip_R_Shoulder') {
+            boneMap._rShoulder = bone;
+            initialQuat._rShoulder = bone.quaternion.clone();
+          }
           if (n === 'J_Bip_C_Neck') {
             boneMap._neck = bone;
             initialQuat._neck = bone.quaternion.clone();
@@ -1022,14 +1038,15 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
       }
 
       if (walkWeight > 0.02) {
-        // Delicate, elegant anime walk for Florie: light steps, graceful arms,
-        // subtle hip sway and a steady, slightly dipped head.
-        const step = s;                       // -1..1, one cycle per step pair
-        const step2 = Math.sin(phase * 2);    // double frequency for bounce
-        const ampLeg = walk * (isShift ? 0.50 : 0.38);
-        const ampArm = walk * (isShift ? 0.26 : 0.18);
+        // Fluid, elegant anime walk: smooth single-frequency motion, no wobble.
+        // Uses the model's joints (hips, spine, chest, shoulders, arms, legs)
+        // for a natural, less rigid result.
+        const step = s;                            // -1..1, leg swing
+        const stepAbs = Math.abs(step);
+        const ampLeg = walk * (isShift ? 0.42 : 0.32);
+        const ampArm = walk * (isShift ? 0.20 : 0.14);
 
-        // Legs: lighter swing, with a touch of knee flex on the supporting leg.
+        // Legs: smooth swing, no abrupt knee flex.
         if (boneMap._lLeg && initialQuat._lLeg) {
           const swingQ = initialQuat._lLeg.clone();
           swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), step * ampLeg));
@@ -1040,70 +1057,98 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
           swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -step * ampLeg));
           boneMap._rLeg.quaternion.slerp(swingQ, walkWeight);
         }
+        // Knees: smooth flex, sine-based (no abrupt max(0,...)).
         if (boneMap._lKnee && initialQuat._lKnee) {
           const kneeQ = initialQuat._lKnee.clone();
-          const kneeFlex = Math.max(0, -step) * 0.16 * walk;
+          const kneeFlex = (0.5 + 0.5 * -step) * 0.12 * walk;   // 0..0.12, smooth
           kneeQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), kneeFlex));
           boneMap._lKnee.quaternion.slerp(kneeQ, walkWeight);
         }
         if (boneMap._rKnee && initialQuat._rKnee) {
           const kneeQ = initialQuat._rKnee.clone();
-          const kneeFlex = Math.max(0, step) * 0.16 * walk;
+          const kneeFlex = (0.5 + 0.5 * step) * 0.12 * walk;
           kneeQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), kneeFlex));
           boneMap._rKnee.quaternion.slerp(kneeQ, walkWeight);
         }
 
-        // Hips: subtle sway plus a tiny bounce.
+        // Hips: gentle single-frequency sway, no double-frequency wobble.
         if (boneMap._hips && initialQuat._hips) {
           const hipQ = initialQuat._hips.clone();
-          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), step * 0.045 * walk));
-          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), step2 * 0.035 * walk));
-          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.abs(step2) * 0.025 * walk));
+          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), step * 0.03 * walk));   // yaw sway
+          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), step * 0.02 * walk));   // gentle roll
+          hipQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), stepAbs * 0.02 * walk)); // subtle pitch
           boneMap._hips.quaternion.slerp(hipQ, walkWeight);
         }
 
-        // Spine: slight forward lean and a gentle counter-twist.
+        // Spine: slight forward lean + gentle counter-twist (single freq).
         if (boneMap._spine && initialQuat._spine) {
           const spineQ = initialQuat._spine.clone();
-          spineQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.05 * walk));
-          spineQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.025 * walk));
+          spineQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.04 * walk));
+          spineQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.02 * walk));
           boneMap._spine.quaternion.slerp(spineQ, walkWeight);
         }
 
-        // Arms: graceful, small swing, held closer to the body.
+        // Chest / upper chest: counter-rotate for fluid torso.
+        if (boneMap._chest && initialQuat._chest) {
+          const chestQ = initialQuat._chest.clone();
+          chestQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.015 * walk));
+          chestQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), stepAbs * 0.012 * walk));
+          boneMap._chest.quaternion.slerp(chestQ, walkWeight);
+        }
+        if (boneMap._upperChest && initialQuat._upperChest) {
+          const ucQ = initialQuat._upperChest.clone();
+          ucQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.01 * walk));
+          boneMap._upperChest.quaternion.slerp(ucQ, walkWeight);
+        }
+
+        // Shoulders: gentle counter-motion for natural arm swing.
+        if (boneMap._lShoulder && initialQuat._lShoulder) {
+          const shQ = initialQuat._lShoulder.clone();
+          shQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -step * 0.02 * walk));
+          boneMap._lShoulder.quaternion.slerp(shQ, walkWeight);
+        }
+        if (boneMap._rShoulder && initialQuat._rShoulder) {
+          const shQ = initialQuat._rShoulder.clone();
+          shQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), step * 0.02 * walk));
+          boneMap._rShoulder.quaternion.slerp(shQ, walkWeight);
+        }
+
+        // Arms: graceful, small swing, lagging slightly (phase offset) for fluidity.
+        const armPhase = step;   // arms counter to legs
         if (boneMap._lArm && initialQuat._lArm) {
           const armQ = initialQuat._lArm.clone();
-          const armEuler = new THREE.Euler(-1.12, 0, -step * ampArm, 'YXZ');
+          const armEuler = new THREE.Euler(-1.10, 0, -armPhase * ampArm, 'YXZ');
           armQ.multiply(new THREE.Quaternion().setFromEuler(armEuler));
           boneMap._lArm.quaternion.slerp(armQ, walkWeight);
         }
         if (boneMap._rArm && initialQuat._rArm) {
           const armQ = initialQuat._rArm.clone();
-          const armEuler = new THREE.Euler(-1.12, 0, step * ampArm, 'YXZ');
+          const armEuler = new THREE.Euler(-1.10, 0, armPhase * ampArm, 'YXZ');
           armQ.multiply(new THREE.Quaternion().setFromEuler(armEuler));
           boneMap._rArm.quaternion.slerp(armQ, walkWeight);
         }
-        // Forearms: a gentle elbow bend so the arms stay soft.
+        // Forearms: gentle elbow bend.
         if (boneMap._lForearm && initialQuat._lForearm) {
           const fQ = initialQuat._lForearm.clone();
-          fQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.22 * walk));
+          fQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.20 * walk));
           boneMap._lForearm.quaternion.slerp(fQ, walkWeight);
         }
         if (boneMap._rForearm && initialQuat._rForearm) {
           const fQ = initialQuat._rForearm.clone();
-          fQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.22 * walk));
+          fQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.20 * walk));
           boneMap._rForearm.quaternion.slerp(fQ, walkWeight);
         }
 
+        // Head: steady, slight yaw, no double-bounce.
         if (boneMap._head && initialQuat._head) {
           const headQ = initialQuat._head.clone();
-          headQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), step * 0.012 * walk));
-          headQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.abs(step2) * 0.01 * walk));
+          headQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), step * 0.01 * walk));
+          headQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), stepAbs * 0.008 * walk));
           boneMap._head.quaternion.slerp(headQ, walkWeight);
         }
         if (boneMap._neck && initialQuat._neck) {
           const neckQ = initialQuat._neck.clone();
-          neckQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.008 * walk));
+          neckQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -step * 0.006 * walk));
           boneMap._neck.quaternion.slerp(neckQ, walkWeight);
         }
       } else if (!glbMixer) {
