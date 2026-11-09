@@ -47,15 +47,15 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   // Peaks during the swing/recovery phase (mid-swing ~ 0.44 rad) and cushions down to soft plant (~ 0.06 rad)
   const kneeCurve = (phaseOffset: number) => (t: number) => {
     const p = phi(t) + phaseOffset;
-    const h1 = Math.sin(p - 0.9);
+    const h1 = Math.sin(p - 1.0);
     const curve = 0.5 + 0.5 * h1;
-    return 0.06 + 0.38 * Math.pow(Math.max(0, curve), 2);
+    return 0.06 + 0.36 * Math.pow(Math.max(0, curve), 2);
   };
 
   // Ankle roll curve: plantarflexion at toe push-off, gentle dorsiflexion at heel contact
   const footCurve = (phaseOffset: number) => (t: number) => {
     const p = phi(t) + phaseOffset;
-    return 0.16 * Math.sin(p - 1.6) - 0.06 * Math.sin(2 * (p - 1.6));
+    return 0.15 * Math.sin(p - 1.6) - 0.04 * Math.sin(2 * (p - 1.6));
   };
 
   // Gentle arm swing: subtle contralateral pendulum, single frequency, no
@@ -152,12 +152,12 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
 
     // --- Legs (Thighs, Knees, Feet) ---
     J_Bip_L_UpperLeg: {
-      rx: (t) => 0.24 * Math.sin(phi(t)) + 0.030 * Math.sin(2 * phi(t) - 1.57),
+      rx: (t) => 0.26 * Math.sin(phi(t)),
       ry: () => -0.010,
       rz: () => 0.014,
     },
     J_Bip_R_UpperLeg: {
-      rx: (t) => -0.24 * Math.sin(phi(t)) - 0.030 * Math.sin(2 * phi(t) - 1.57),
+      rx: (t) => -0.26 * Math.sin(phi(t)),
       ry: () => 0.010,
       rz: () => -0.014,
     },
@@ -169,11 +169,11 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     },
     J_Bip_L_Foot: {
       rx: footCurve(0),
-      rz: (t) => -0.022 * Math.sin(phi(t)),
+      rz: (t) => -0.018 * Math.sin(phi(t)),
     },
     J_Bip_R_Foot: {
       rx: footCurve(Math.PI),
-      rz: (t) => -0.022 * Math.sin(phi(t)),
+      rz: (t) => 0.018 * Math.sin(phi(t)),
     },
   };
 
