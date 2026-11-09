@@ -59,21 +59,23 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     return 0.16 * Math.sin(p - 1.6) - 0.06 * Math.sin(2 * (p - 1.6));
   };
 
-  // Arm swing pitch: forward-only swing, contralateral to leg stride (opposite arm & leg)
-  // Left arm swings forward (negative) when right leg steps forward; right arm swings forward (positive) when left leg steps forward
-  // Smoothed rectification (pow 1.5) so the arm eases back to neutral instead of snapping abruptly
-  const armPitchL = (t: number) => -0.50 * Math.pow(Math.max(0, -Math.sin(phi(t) - 0.08)), 1.5);
-  const armPitchR = (t: number) => 0.50 * Math.pow(Math.max(0, Math.sin(phi(t) - 0.08)), 1.5);
+  // Arm swing: forward-only, contralateral to the legs. A squared-sine envelope
+  // gives a C1-smooth pulse (zero velocity at both ends) so the arm eases
+  // into and out of the forward swing instead of snapping. Both arms use the
+  // same gating logic, so they stay perfectly synchronized.
+  const envL = (t: number, lag: number) => { const s = Math.sin(phi(t) - lag); return s < 0 ? s * s : 0; };
+  const envR = (t: number, lag: number) => { const s = Math.sin(phi(t) - lag); return s > 0 ? s * s : 0; };
+  const armPitchL = (t: number) => -0.52 * envL(t, 0.08);
+  const armPitchR = (t: number) => 0.52 * envR(t, 0.08);
 
   // Active elbow joint rotation on top of the initial relaxed bend:
-  // Elbow bends backward when the forearm swings forward, then returns to neutral
   // Elbow bends backward when the forearm swings forward, then eases back to neutral
-  const elbowPitchL = (t: number) => 0.16 + 0.30 * Math.pow(Math.max(0, -Math.sin(phi(t) - 0.38)), 1.5);
-  const elbowPitchR = (t: number) => 0.16 - 0.30 * Math.pow(Math.max(0, Math.sin(phi(t) - 0.38)), 1.5);
+  const elbowPitchL = (t: number) => 0.16 + 0.34 * envL(t, 0.40);
+  const elbowPitchR = (t: number) => 0.16 - 0.34 * envR(t, 0.40);
 
   // Wrist trailing wave: fluid whip-like trailing wave following the forearm
-  const wristPitchL = (t: number) => -0.16 * Math.sin(phi(t) - 0.68);
-  const wristPitchR = (t: number) => 0.16 * Math.sin(phi(t) - 0.68);
+  const wristPitchL = (t: number) => 0.20 * envL(t, 0.72);
+  const wristPitchR = (t: number) => -0.20 * envR(t, 0.72);
 
   const motions: Record<string, Motion> = {
     // --- Pelvis / Hips ---
@@ -120,11 +122,11 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     // --- Shoulders (fluid clavicle roll connected to arm swing, zero lateral wobble) ---
     J_Bip_L_Shoulder: {
       rx: (t) => 0.008 * Math.cos(2 * phi(t)),
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_L, -0.05 * Math.sin(phi(t) - 0.08)),
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_L, -0.06 * envL(t, 0.08)),
     },
     J_Bip_R_Shoulder: {
       rx: (t) => 0.008 * Math.cos(2 * phi(t)),
-      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_R, 0.05 * Math.sin(phi(t) - 0.08)),
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_R, 0.06 * envR(t, 0.08)),
     },
 
     // --- Arms (pure front-and-back sagittal swing, zero left-to-right drift, zero twist) ---
@@ -253,7 +255,7 @@ function addWalkSecondaryMotions(
         ? (isLower ? PITCH_SLEEVE_LOWER_L : PITCH_SLEEVE_TIP_L)
         : (isLower ? PITCH_SLEEVE_LOWER_R : PITCH_SLEEVE_TIP_R);
       const sign = isLeft ? 1 : -1;
-      const angleFn = (t: number) => sign * 0.16 * Math.sin(phi(t) - 0.50 - stagger);
+      const angleFn = (t: number) => { const s = Math.sin(phi(t) - 0.50 - stagger); const env = isLeft ? (s < 0 ? s * s : 0) : (s > 0 ? s * s : 0); return isLeft ? -0.18 * env : 0.18 * env; };
       motions[bone.name] = {
         quat: (t: number) => new THREE.Quaternion().setFromAxisAngle(axis, angleFn(t)),
       };
