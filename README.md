@@ -7,8 +7,7 @@ Prototype de jeu 3D interactif dans lequel Florie explore le lycée East High à
 Prérequis : Node.js et npm (ou Bun).
 
 ```bash
-npm install
-npm run dev
+npm.cmd run dev
 ```
 
 Vite démarre le serveur de développement sur le port **3000**.
