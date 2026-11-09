@@ -67,8 +67,8 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   // Active elbow joint rotation on top of the initial relaxed bend:
   // Reversed and slightly amplified for a softer, more natural arm swing
   // (up to ~+0.51 rad extra bend, down to ~-0.19 rad)
-  const elbowPitchL = (t: number) => 0.16 + 0.25 * Math.sin(phi(t) - 0.38);
-  const elbowPitchR = (t: number) => 0.16 - 0.25 * Math.sin(phi(t) - 0.38);
+  const elbowPitchL = (t: number) => 0.16 - 0.25 * Math.sin(phi(t) - 0.38);
+  const elbowPitchR = (t: number) => 0.16 + 0.25 * Math.sin(phi(t) - 0.38);
 
   // Wrist trailing wave: fluid whip-like trailing wave following the forearm
   const wristPitchL = (t: number) => -0.16 * Math.sin(phi(t) - 0.68);
