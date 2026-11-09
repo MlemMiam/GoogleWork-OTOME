@@ -62,16 +62,21 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   // wobble. Amplitudes kept small so the arms just sway with the gait
   // without forming an undesirable curve.
   const armAmp = 0.18;
-  const armSwingL = (t: number) => -armAmp * Math.sin(phi(t) - 0.10);
-  const armSwingR = (t: number) => armAmp * Math.sin(phi(t) - 0.10);
+  // Primary swing + a small lagged component so the arm settles instead of
+  // moving as a single rigid pendulum (still one frequency -> no wobble).
+  const armSwingL = (t: number) => -armAmp * Math.sin(phi(t) - 0.10)
+    - 0.05 * Math.sin(phi(t) - 0.55);
+  const armSwingR = (t: number) => armAmp * Math.sin(phi(t) - 0.10)
+    + 0.05 * Math.sin(phi(t) - 0.55);
 
   // Shoulder roll follows the arm swing, very softly.
-  const shoulderRollL = (t: number) => -0.04 * Math.sin(phi(t) - 0.05);
-  const shoulderRollR = (t: number) => 0.04 * Math.sin(phi(t) - 0.05);
+  const shoulderRollL = (t: number) => -0.05 * Math.sin(phi(t) - 0.05);
+  const shoulderRollR = (t: number) => 0.05 * Math.sin(phi(t) - 0.05);
 
   // Wrist trails the forearm lightly.
-  const wristTrailL = (t: number) => -0.05 * Math.sin(phi(t) - 0.60);
-  const wristTrailR = (t: number) => 0.05 * Math.sin(phi(t) - 0.60);
+  const wristTrailL = (t: number) => -0.08 * Math.sin(phi(t) - 0.60);
+  const wristTrailR = (t: number) => 0.08 * Math.sin(phi(t) - 0.60);
+
 
   const motions: Record<string, Motion> = {
     // --- Pelvis / Hips ---
@@ -133,7 +138,7 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
       quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_R, armSwingR(t)),
     },
 
-    // --- Elbows / Forearms (held in relaxed pose, no extra flex) ---
+    // --- Elbows / Forearms (held in relaxed pose; flex removed to avoid curve) ---
     J_Bip_L_LowerArm: {},
     J_Bip_R_LowerArm: {},
 
