@@ -955,9 +955,9 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
           Fcl_EYE_Sorrow: 0.55,
           Fcl_BRW_Sorrow: 0.55,
           Fcl_MTH_Close: 1.00,
-          Fcl_MTH_Small: 0.40,
-          Fcl_MTH_Down: 0.35,
-          Fcl_MTH_U: 0.25,
+          Fcl_MTH_Small: 0.25,
+          Fcl_MTH_Down: 0.20,
+          Fcl_MTH_U: 0.15,
         };
         for (const [name, weight] of Object.entries(shyExpr)) {
           const idx = dict[name];
