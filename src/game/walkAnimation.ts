@@ -69,12 +69,12 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   // Elbow flexes when the arm swings forward, extends on the backswing.
   const fwdEnvL = (t: number) => { const s = -Math.sin(phi(t) - 0.35); return s > 0 ? s * s : 0; };
   const fwdEnvR = (t: number) => { const s = Math.sin(phi(t) - 0.35); return s > 0 ? s * s : 0; };
-  const elbowPitchL = (t: number) => 0.16 - 0.18 * fwdEnvL(t);
-  const elbowPitchR = (t: number) => 0.16 + 0.18 * fwdEnvR(t);
+  const elbowPitchL = (t: number) => 0.16 + 0.10 * fwdEnvL(t);
+  const elbowPitchR = (t: number) => 0.16 - 0.10 * fwdEnvR(t);
 
   // Wrist trails the forearm (follow-through).
-  const wristTrailL = (t: number) => -0.22 * Math.sin(phi(t) - 0.65);
-  const wristTrailR = (t: number) => 0.22 * Math.sin(phi(t) - 0.65);
+  const wristTrailL = (t: number) => -0.12 * Math.sin(phi(t) - 0.65);
+  const wristTrailR = (t: number) => 0.12 * Math.sin(phi(t) - 0.65);
 
   // Shoulder roll follows the arm swing.
   const shoulderRollL = (t: number) => -0.08 * Math.sin(phi(t) - 0.05);
