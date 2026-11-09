@@ -37,6 +37,7 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
     result.position.set(x, y, z);
     return result;
   };
+  const cleanupCallbacks = (scene.userData.cleanupCallbacks ??= []) as Array<() => void>;
 
   // Layered limestone portal, capstones, fine seams and a crest plate.
   [-3.35, 3.35].forEach((x) => {
@@ -119,7 +120,6 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
     angle += ((opened ? 1.12 : 0) - angle) * Math.min(1, dt * 4.5);
     leaves.forEach(({ group, side }) => { group.rotation.y = -side * angle; });
   };
-  const cleanupCallbacks = (scene.userData.cleanupCallbacks ??= []) as Array<() => void>;
   cleanupCallbacks.push(() => window.removeEventListener('keydown', onKeyDown));
 
   // Fine window trim and small warm sconces around the entry.
@@ -231,6 +231,5 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
     window.removeEventListener('keydown', onKeyDown);
     hint.remove();
   };
-  const cleanupCallbacks = (scene.userData.cleanupCallbacks ??= []) as Array<() => void>;
   cleanupCallbacks.push(dispose);
 }
