@@ -58,8 +58,20 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
     return 0.16 * Math.sin(p - 1.6) - 0.06 * Math.sin(2 * (p - 1.6));
   };
 
-  // Arms are intentionally left unanimated during the walk: they keep the
-  // relaxed pose defined in applyRelaxedPose (no swing, no curve, no wobble).
+  // Gentle arm swing: subtle contralateral pendulum, single frequency, no
+  // wobble. Amplitudes kept small so the arms just sway with the gait
+  // without forming an undesirable curve.
+  const armAmp = 0.18;
+  const armSwingL = (t: number) => -armAmp * Math.sin(phi(t) - 0.10);
+  const armSwingR = (t: number) => armAmp * Math.sin(phi(t) - 0.10);
+
+  // Shoulder roll follows the arm swing, very softly.
+  const shoulderRollL = (t: number) => -0.04 * Math.sin(phi(t) - 0.05);
+  const shoulderRollR = (t: number) => 0.04 * Math.sin(phi(t) - 0.05);
+
+  // Wrist trails the forearm lightly.
+  const wristTrailL = (t: number) => -0.05 * Math.sin(phi(t) - 0.60);
+  const wristTrailR = (t: number) => 0.05 * Math.sin(phi(t) - 0.60);
 
   const motions: Record<string, Motion> = {
     // --- Pelvis / Hips ---
@@ -103,17 +115,35 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
       rz: (t) => 0.007 * Math.sin(phi(t) + 0.35),
     },
 
-    // --- Shoulders (held in relaxed pose, no animation) ---
-    J_Bip_L_Shoulder: {},
-    J_Bip_R_Shoulder: {},
+    // --- Shoulders (gentle clavicle roll following the arm swing) ---
+    J_Bip_L_Shoulder: {
+      rx: (t) => 0.004 * Math.cos(2 * phi(t)),
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_L, shoulderRollL(t)),
+    },
+    J_Bip_R_Shoulder: {
+      rx: (t) => 0.004 * Math.cos(2 * phi(t)),
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_R, shoulderRollR(t)),
+    },
 
-    // --- Arms / Elbows / Wrists / Hands (held in relaxed pose, no animation) ---
-    J_Bip_L_UpperArm: {},
-    J_Bip_R_UpperArm: {},
+    // --- Arms (gentle contralateral swing) ---
+    J_Bip_L_UpperArm: {
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_L, armSwingL(t)),
+    },
+    J_Bip_R_UpperArm: {
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_UPPER_R, armSwingR(t)),
+    },
+
+    // --- Elbows / Forearms (held in relaxed pose, no extra flex) ---
     J_Bip_L_LowerArm: {},
     J_Bip_R_LowerArm: {},
-    J_Bip_L_Hand: {},
-    J_Bip_R_Hand: {},
+
+    // --- Wrists / Hands (light trailing) ---
+    J_Bip_L_Hand: {
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_HAND_L, wristTrailL(t)),
+    },
+    J_Bip_R_Hand: {
+      quat: (t) => new THREE.Quaternion().setFromAxisAngle(PITCH_HAND_R, wristTrailR(t)),
+    },
 
     // --- Legs (Thighs, Knees, Feet) ---
     J_Bip_L_UpperLeg: {
