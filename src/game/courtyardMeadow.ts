@@ -121,26 +121,24 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
     ];
     return features.some(([cx, cz, radius]) => Math.hypot(x - cx, z - cz) < radius);
   };
-  // Restrict ground cover to the courtyard's flat lawn, leaving paving, paths and beds clear.
   const onLawn = (x: number, z: number) =>
     x >= -29 && x <= 29 && z >= 0.2 && z <= 22.2 && !onPath(x, z) && !nearGardenObject(x, z);
 
-  // Each instance is a small tuft of three slender, splayed blades, not a single dark spike.
-  // The mesh has a curved profile and a broad, softly tapered base for a more natural silhouette.
+  // Each instance is a soft, curved tuft of three slender blades, splayed in different directions.
   const tuftGeometry = (() => {
     const positions: number[] = [];
     const indices: number[] = [];
     const bladeCount = 3;
-    const rows = 5;
+    const rows = 6;
     for (let blade = 0; blade < bladeCount; blade++) {
       const angle = (blade / bladeCount) * Math.PI * 2 + blade * 0.73;
-      const spread = 0.012 + blade * 0.003;
+      const spread = 0.014 + blade * 0.003;
       const base = positions.length / 3;
       for (let row = 0; row <= rows; row++) {
         const t = row / rows;
-        const halfWidth = 0.009 * Math.pow(1 - t, 1.1) + 0.00045;
+        const halfWidth = 0.009 * Math.pow(1 - t, 1.1) + 0.0004;
         const reach = spread * t;
-        const bend = 0.045 * t * t;
+        const bend = 0.07 * t * t;
         const centerX = Math.cos(angle) * reach + Math.sin(angle) * bend;
         const centerZ = Math.sin(angle) * reach - Math.cos(angle) * bend;
         const sideX = -Math.sin(angle) * halfWidth;
@@ -163,16 +161,16 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
     roughness: 1,
     side: THREE.DoubleSide,
     vertexColors: true,
-    // Subtle green bounce prevents the thin, back-facing blades from reading as black.
-    emissive: 0x829b68,
-    emissiveIntensity: 0.22,
+    // Soft green bounce prevents thin, back-facing blades from reading as black.
+    emissive: 0x91aa78,
+    emissiveIntensity: 0.3,
   });
-  const grassPalette = [0xc1dba0, 0xd0e3ae, 0xb5d38f, 0xd8e8b8, 0xc7dfa4, 0xaecd88];
-  const gridStep = isSoftwareGl ? 0.18 : 0.125;
+  const grassPalette = [0xc5dfa4, 0xd4e8b6, 0xb9d897, 0xdcecc2, 0xcbe3ad, 0xb8d79a];
+  const gridStep = isSoftwareGl ? 0.15 : 0.095;
   const columns = Math.ceil(58 / gridStep);
   const rows = Math.ceil(22 / gridStep);
   const grass = new THREE.InstancedMesh(tuftGeometry, grassMaterial, columns * rows);
-  grass.name = 'Natural light-green courtyard grass tufts';
+  grass.name = 'Soft dense light-green courtyard grass';
   grass.castShadow = false;
   grass.receiveShadow = false;
   grass.frustumCulled = false;
@@ -186,29 +184,29 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
   let tuftIndex = 0;
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
-      const x = -29 + (column + 0.5) * gridStep + (random() - 0.5) * gridStep * 0.95;
-      const z = 0.2 + (row + 0.5) * gridStep + (random() - 0.5) * gridStep * 0.95;
+      const x = -29 + (column + 0.5) * gridStep + (random() - 0.5) * gridStep * 1.15;
+      const z = 0.2 + (row + 0.5) * gridStep + (random() - 0.5) * gridStep * 1.15;
       if (!onLawn(x, z)) continue;
 
-      // A low-frequency density variation creates loose clumps and short, open patches.
+      // Soft density waves form loose clumps, with only small gaps between them.
       const wave = 0.5 + 0.25 * Math.sin(x * 0.72 + Math.sin(z * 0.43)) + 0.25 * Math.cos(z * 0.64 - x * 0.19);
-      const density = THREE.MathUtils.clamp(0.7 + wave * 0.22, 0.68, 0.92);
+      const density = THREE.MathUtils.clamp(0.82 + wave * 0.15, 0.8, 0.96);
       if (random() > density) continue;
 
-      position.set(x, 0.012 + random() * 0.004, z);
+      position.set(x, 0.01 + random() * 0.003, z);
       const yaw = random() * Math.PI * 2;
-      const lean = (random() - 0.5) * 0.42;
-      euler.set(lean * 0.35, yaw, lean);
+      const lean = (random() - 0.5) * 0.34;
+      euler.set(lean * 0.3, yaw, lean);
       quaternion.setFromEuler(euler);
-      // Deliberately varied blade lengths create mixed short and slightly taller tufts.
+      // Mostly short grass with a few slightly taller blades for a natural uneven edge.
       const heightRoll = random();
-      const height = heightRoll < 0.24 ? 0.35 + random() * 0.2 : 0.58 + random() * 0.58;
-      const widthScale = 0.72 + random() * 0.75;
+      const height = heightRoll < 0.78 ? 0.24 + random() * 0.24 : 0.42 + random() * 0.25;
+      const widthScale = 0.72 + random() * 0.8;
       scale.set(widthScale, height, widthScale);
       matrix.compose(position, quaternion, scale);
       grass.setMatrixAt(tuftIndex, matrix);
       color.setHex(grassPalette[Math.floor(random() * grassPalette.length)]);
-      color.multiplyScalar(0.97 + random() * 0.1);
+      color.multiplyScalar(0.98 + random() * 0.08);
       grass.setColorAt(tuftIndex, color);
       tuftIndex++;
     }
@@ -218,23 +216,23 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
   if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
   scene.add(grass);
 
-  // More wildflowers distributed across the lawn, in small irregular clusters.
+  // Fine little wildflowers in scattered mini-clusters across the flat lawn.
   const flowerPositions: Array<[number, number, number]> = [];
-  const flowerGrid = 0.62;
-  for (let z = 0.55; z < 22; z += flowerGrid) {
+  const flowerGrid = 0.48;
+  for (let z = 0.45; z < 22; z += flowerGrid) {
     for (let x = -28; x < 28; x += flowerGrid) {
       const flowerX = x + (random() - 0.5) * flowerGrid;
       const flowerZ = z + (random() - 0.5) * flowerGrid;
-      const clusterChance = random() < 0.16 ? 0.56 : 0.12;
+      const clusterChance = random() < 0.18 ? 0.42 : 0.09;
       if (onLawn(flowerX, flowerZ) && random() < clusterChance) {
-        flowerPositions.push([flowerX, flowerZ, 0.15 + random() * 0.14]);
+        flowerPositions.push([flowerX, flowerZ, 0.12 + random() * 0.1]);
       }
     }
   }
 
   const stems = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.0035, 0.006, 1, 5, 3),
-    new THREE.MeshStandardMaterial({ color: 0x789565, roughness: 0.96 }),
+    new THREE.CylinderGeometry(0.0025, 0.0045, 1, 5, 3),
+    new THREE.MeshStandardMaterial({ color: 0x849b68, roughness: 0.96 }),
     flowerPositions.length
   );
   stems.castShadow = false;
@@ -254,7 +252,7 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
   petals.receiveShadow = false;
   const blossomColors = [0xf3e7d4, 0xf1bfd0, 0xe9aebf, 0xf5d98d, 0xcbd6ef, 0xffffff];
   const centers = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.013, 10, 8),
+    new THREE.SphereGeometry(0.01, 10, 8),
     new THREE.MeshStandardMaterial({ color: 0xf3d07a, roughness: 0.82 }),
     flowerPositions.length
   );
@@ -263,27 +261,27 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
 
   let petalIndex = 0;
   flowerPositions.forEach(([x, z, height], index) => {
-    position.set(x, height / 2 + 0.015, z);
+    position.set(x, height / 2 + 0.012, z);
     euler.set(0, random() * Math.PI * 2, (random() - 0.5) * 0.08);
     quaternion.setFromEuler(euler);
     scale.set(1, height, 1);
     matrix.compose(position, quaternion, scale);
     stems.setMatrixAt(index, matrix);
 
-    const flowerY = height + 0.015;
+    const flowerY = height + 0.012;
     const petalColor = new THREE.Color(blossomColors[Math.floor(random() * blossomColors.length)]);
     for (let p = 0; p < petalsPerFlower; p++) {
       const angle = (p / petalsPerFlower) * Math.PI * 2 + random() * 0.08;
-      position.set(x + Math.cos(angle) * 0.012, flowerY, z + Math.sin(angle) * 0.012);
+      position.set(x + Math.cos(angle) * 0.009, flowerY, z + Math.sin(angle) * 0.009);
       euler.set(-Math.PI / 2 + (random() - 0.5) * 0.1, angle, (random() - 0.5) * 0.06);
       quaternion.setFromEuler(euler);
-      scale.set(0.018 + random() * 0.006, 0.028 + random() * 0.01, 1);
+      scale.set(0.014 + random() * 0.005, 0.023 + random() * 0.008, 1);
       matrix.compose(position, quaternion, scale);
       petals.setMatrixAt(petalIndex, matrix);
       petals.setColorAt(petalIndex, petalColor);
       petalIndex++;
     }
-    position.set(x, flowerY + 0.003, z);
+    position.set(x, flowerY + 0.002, z);
     scale.setScalar(1);
     matrix.compose(position, new THREE.Quaternion(), scale);
     centers.setMatrixAt(index, matrix);
