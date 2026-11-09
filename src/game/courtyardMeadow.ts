@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 
-/** Adds a painted anime sky, soft light, fine grass and delicate flowers to the courtyard. */
+/** Adds an illustrated sky, soft light, dense fine grass and delicate flowers to the courtyard. */
 export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): void {
   let seed = 90731;
   const random = () => {
@@ -69,13 +69,12 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
   skyDome.frustumCulled = false;
   scene.add(skyDome);
 
-  // Gentle warm bounce and rim lighting soften the courtyard without flattening it.
   scene.add(new THREE.HemisphereLight(0xfff1de, 0x71885f, 0.22));
   const rimLight = new THREE.DirectionalLight(0xffe6ca, 0.2);
   rimLight.position.set(-14, 18, 12);
   scene.add(rimLight);
 
-  // Give existing rounded tree crowns subtle light transmission while retaining their color.
+  // Let soft light show through the existing rounded tree crowns.
   const translucentMaterials = new Map<THREE.Material, THREE.Material>();
   const crownWorldPosition = new THREE.Vector3();
   scene.traverse((object) => {
@@ -101,15 +100,40 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
       : makeLeafMaterial(object.material);
   });
 
-  // Narrow, curved grass ribbons, short enough to sit naturally against the lawn texture.
+  const distanceToSegment = (x: number, z: number, ax: number, az: number, bx: number, bz: number) => {
+    const dx = bx - ax;
+    const dz = bz - az;
+    const lengthSq = dx * dx + dz * dz;
+    const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / lengthSq, 0, 1);
+    return Math.hypot(x - (ax + t * dx), z - (az + t * dz));
+  };
+  const onPath = (x: number, z: number) => {
+    if (Math.abs(x) < 3.55 && z > -3.2 && z < 23.5) return true;
+    if (Math.abs(x) < 7.8 && z > -6 && z < -1.2) return true;
+    return distanceToSegment(x, z, 5, 0, 25, 22.5) < 2.2 ||
+      distanceToSegment(x, z, -5, 0, -25, 22.5) < 2.2;
+  };
+  const nearGardenObject = (x: number, z: number) => {
+    const features: Array<[number, number, number]> = [
+      [-10.2, 10.2, 3.8], [10.2, 10.2, 3.8], [-18.2, 20.5, 3.8], [18.2, 20.5, 3.8],
+      [-18, 13.5, 3.4], [18, 13.5, 3.4], [-7.3, 18.4, 2.2], [7.3, 18.4, 2.2],
+      [-8, 2, 1.5], [8, 2, 1.5], [-16, 9, 1.5], [16, 9, 1.5], [-22, 2, 1.5], [22, 2, 1.5],
+    ];
+    return features.some(([cx, cz, radius]) => Math.hypot(x - cx, z - cz) < radius);
+  };
+  // Restrict all ground cover to the courtyard's flat lawn, leaving paving, paths and beds clear.
+  const onLawn = (x: number, z: number) =>
+    x >= -29 && x <= 29 && z >= 0.2 && z <= 22.2 && !onPath(x, z) && !nearGardenObject(x, z);
+
+  // Very fine, short curved blades, laid out on a jittered grid to eliminate empty patches.
   const bladeGeometry = (() => {
     const positions: number[] = [];
     const indices: number[] = [];
-    const rows = 6;
+    const rows = 5;
     for (let row = 0; row <= rows; row++) {
       const t = row / rows;
-      const width = 0.009 * Math.pow(1 - t, 1.15) + 0.0004;
-      const bend = 0.065 * t * t;
+      const width = 0.008 * Math.pow(1 - t, 1.15) + 0.00035;
+      const bend = 0.055 * t * t;
       positions.push(-width / 2, t, bend, width / 2, t, bend);
       if (row < rows) {
         const a = row * 2;
@@ -128,11 +152,14 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
     side: THREE.DoubleSide,
     vertexColors: true,
   });
-  // Light sage/olive tones harmonize with the painted ground texture (#638c50).
-  const grassPalette = [0x92ad70, 0xa0b77b, 0x88a568, 0xb0c28a, 0x96b276, 0xa8bc82];
-  const bladeCount = 24000;
-  const grass = new THREE.InstancedMesh(bladeGeometry, grassMaterial, bladeCount);
-  grass.name = 'Dense short light courtyard grass';
+  // Pale sage shades sit closer to the underlying lawn color instead of appearing black.
+  const grassPalette = [0xa6c98a, 0xb5d69a, 0x9fc783, 0xc0dca4, 0xaed195, 0xb8d79b];
+  const gridStep = 0.105;
+  const columns = Math.ceil(58 / gridStep);
+  const rows = Math.ceil(22 / gridStep);
+  const grassCapacity = columns * rows;
+  const grass = new THREE.InstancedMesh(bladeGeometry, grassMaterial, grassCapacity);
+  grass.name = 'Continuous fine light courtyard grass';
   grass.castShadow = false;
   grass.receiveShadow = false;
   grass.frustumCulled = false;
@@ -143,73 +170,49 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
   const quaternion = new THREE.Quaternion();
   const euler = new THREE.Euler();
   const color = new THREE.Color();
-
-  const distanceToSegment = (x: number, z: number, ax: number, az: number, bx: number, bz: number) => {
-    const dx = bx - ax;
-    const dz = bz - az;
-    const lengthSq = dx * dx + dz * dz;
-    const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / lengthSq, 0, 1);
-    return Math.hypot(x - (ax + t * dx), z - (az + t * dz));
-  };
-  // These bounds stay within the courtyard's flat lawn; paths and planted features are excluded.
-  const onPath = (x: number, z: number) => {
-    if (Math.abs(x) < 3.55 && z > -3.2 && z < 23.5) return true;
-    if (Math.abs(x) < 7.8 && z > -6 && z < -1.2) return true;
-    return distanceToSegment(x, z, 5, 0, 25, 22.5) < 2.2 ||
-      distanceToSegment(x, z, -5, 0, -25, 22.5) < 2.2;
-  };
-  const nearGardenObject = (x: number, z: number) => {
-    const features: Array<[number, number, number]> = [
-      [-10.2, 10.2, 3.8], [10.2, 10.2, 3.8], [-18.2, 20.5, 3.8], [18.2, 20.5, 3.8],
-      [-18, 13.5, 3.4], [18, 13.5, 3.4], [-7.3, 18.4, 2.2], [7.3, 18.4, 2.2],
-      [-8, 2, 1.5], [8, 2, 1.5], [-16, 9, 1.5], [16, 9, 1.5], [-22, 2, 1.5], [22, 2, 1.5],
-    ];
-    return features.some(([cx, cz, radius]) => Math.hypot(x - cx, z - cz) < radius);
-  };
-  const onLawn = (x: number, z: number) =>
-    x >= -29 && x <= 29 && z >= 0.2 && z <= 22.2 && !onPath(x, z) && !nearGardenObject(x, z);
-
-  let placed = 0;
-  let attempts = 0;
-  while (placed < bladeCount && attempts < bladeCount * 8) {
-    attempts++;
-    const x = -29 + random() * 58;
-    const z = 0.2 + random() * 22.2;
-    if (!onLawn(x, z)) continue;
-    position.set(x + (random() - 0.5) * 0.16, 0.016 + random() * 0.006, z + (random() - 0.5) * 0.16);
-    euler.set((random() - 0.5) * 0.1, random() * Math.PI * 2, (random() - 0.5) * 0.12);
-    quaternion.setFromEuler(euler);
-    const height = 0.055 + random() * 0.095;
-    scale.set(0.8 + random() * 0.5, height, 0.8 + random() * 0.5);
-    matrix.compose(position, quaternion, scale);
-    grass.setMatrixAt(placed, matrix);
-    color.setHex(grassPalette[Math.floor(random() * grassPalette.length)]);
-    color.multiplyScalar(0.94 + random() * 0.14);
-    grass.setColorAt(placed, color);
-    placed++;
+  let bladeIndex = 0;
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const x = -29 + (column + 0.5) * gridStep + (random() - 0.5) * gridStep * 0.65;
+      const z = 0.2 + (row + 0.5) * gridStep + (random() - 0.5) * gridStep * 0.65;
+      if (!onLawn(x, z)) continue;
+      position.set(x, 0.012 + random() * 0.004, z);
+      euler.set((random() - 0.5) * 0.08, random() * Math.PI * 2, (random() - 0.5) * 0.1);
+      quaternion.setFromEuler(euler);
+      const height = 0.045 + random() * 0.075;
+      scale.set(0.8 + random() * 0.45, height, 0.8 + random() * 0.45);
+      matrix.compose(position, quaternion, scale);
+      grass.setMatrixAt(bladeIndex, matrix);
+      color.setHex(grassPalette[Math.floor(random() * grassPalette.length)]);
+      color.multiplyScalar(0.96 + random() * 0.12);
+      grass.setColorAt(bladeIndex, color);
+      bladeIndex++;
+    }
   }
-  grass.count = placed;
+  grass.count = bladeIndex;
   grass.instanceMatrix.needsUpdate = true;
   if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
   scene.add(grass);
 
-  // Small wildflowers with fine stems and eight separate, softly colored petals.
+  // More wildflowers, distributed evenly so they appear throughout the grassy patches.
   const flowerPositions: Array<[number, number, number]> = [];
-  attempts = 0;
-  while (flowerPositions.length < 120 && attempts < 2400) {
-    attempts++;
-    const x = -28 + random() * 56;
-    const z = 0.3 + random() * 21.7;
-    if (!onLawn(x, z)) continue;
-    flowerPositions.push([x, z, 0.2 + random() * 0.16]);
+  const flowerGrid = 0.72;
+  for (let z = 0.55; z < 22; z += flowerGrid) {
+    for (let x = -28; x < 28; x += flowerGrid) {
+      const flowerX = x + (random() - 0.5) * flowerGrid * 0.8;
+      const flowerZ = z + (random() - 0.5) * flowerGrid * 0.8;
+      if (onLawn(flowerX, flowerZ) && random() < 0.22) {
+        flowerPositions.push([flowerX, flowerZ, 0.16 + random() * 0.13]);
+      }
+    }
   }
 
   const stems = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.0045, 0.008, 1, 6, 3),
-    new THREE.MeshStandardMaterial({ color: 0x668354, roughness: 0.96 }),
+    new THREE.CylinderGeometry(0.0035, 0.006, 1, 5, 3),
+    new THREE.MeshStandardMaterial({ color: 0x718d5b, roughness: 0.96 }),
     flowerPositions.length
   );
-  stems.castShadow = !isSoftwareGl;
+  stems.castShadow = false;
   stems.receiveShadow = false;
   const petalShape = new THREE.Shape();
   petalShape.moveTo(0, 0);
@@ -222,11 +225,11 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, side: THREE.DoubleSide }),
     flowerPositions.length * petalsPerFlower
   );
-  petals.castShadow = !isSoftwareGl;
+  petals.castShadow = false;
   petals.receiveShadow = false;
-  const blossomColors = [0xf3e7d4, 0xf1bfd0, 0xe9aebf, 0xf5d98d, 0xcbd6ef];
+  const blossomColors = [0xf3e7d4, 0xf1bfd0, 0xe9aebf, 0xf5d98d, 0xcbd6ef, 0xffffff];
   const centers = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.016, 12, 8),
+    new THREE.SphereGeometry(0.013, 10, 8),
     new THREE.MeshStandardMaterial({ color: 0xf3d07a, roughness: 0.82 }),
     flowerPositions.length
   );
@@ -235,26 +238,27 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
 
   let petalIndex = 0;
   flowerPositions.forEach(([x, z, height], index) => {
-    position.set(x, height / 2 + 0.02, z);
-    euler.set(0, random() * Math.PI * 2, (random() - 0.5) * 0.1);
+    position.set(x, height / 2 + 0.015, z);
+    euler.set(0, random() * Math.PI * 2, (random() - 0.5) * 0.08);
     quaternion.setFromEuler(euler);
     scale.set(1, height, 1);
     matrix.compose(position, quaternion, scale);
     stems.setMatrixAt(index, matrix);
-    const flowerY = height + 0.02;
+
+    const flowerY = height + 0.015;
     const petalColor = new THREE.Color(blossomColors[Math.floor(random() * blossomColors.length)]);
     for (let p = 0; p < petalsPerFlower; p++) {
       const angle = (p / petalsPerFlower) * Math.PI * 2 + random() * 0.08;
-      position.set(x + Math.cos(angle) * 0.015, flowerY, z + Math.sin(angle) * 0.015);
+      position.set(x + Math.cos(angle) * 0.012, flowerY, z + Math.sin(angle) * 0.012);
       euler.set(-Math.PI / 2 + (random() - 0.5) * 0.1, angle, (random() - 0.5) * 0.06);
       quaternion.setFromEuler(euler);
-      scale.set(0.022 + random() * 0.006, 0.034 + random() * 0.012, 1);
+      scale.set(0.018 + random() * 0.006, 0.028 + random() * 0.01, 1);
       matrix.compose(position, quaternion, scale);
       petals.setMatrixAt(petalIndex, matrix);
       petals.setColorAt(petalIndex, petalColor);
       petalIndex++;
     }
-    position.set(x, flowerY + 0.004, z);
+    position.set(x, flowerY + 0.003, z);
     scale.setScalar(1);
     matrix.compose(position, new THREE.Quaternion(), scale);
     centers.setMatrixAt(index, matrix);
@@ -265,26 +269,26 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
   centers.instanceMatrix.needsUpdate = true;
   scene.add(stems, petals, centers);
 
-  // More small, thin petals scattered only over lawn patches, away from pavement and beds.
-  const fallenCapacity = 700;
+  // Small, slender blossom petals scattered only over lawn—not over pavement or paths.
+  const fallenCapacity = 900;
   const fallen = new THREE.InstancedMesh(
     petalGeometry,
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, side: THREE.DoubleSide }),
     fallenCapacity
   );
-  fallen.receiveShadow = !isSoftwareGl;
-  const fallenPalette = [0xf3e7d4, 0xf1bfd0, 0xe9aebf, 0xf7d7d1];
+  fallen.receiveShadow = false;
+  const fallenPalette = [0xf3e7d4, 0xf1bfd0, 0xe9aebf, 0xf7d7d1, 0xffffff];
   let fallenCount = 0;
-  attempts = 0;
-  while (fallenCount < fallenCapacity && attempts < fallenCapacity * 10) {
+  let attempts = 0;
+  while (fallenCount < fallenCapacity && attempts < fallenCapacity * 12) {
     attempts++;
     const x = -29 + random() * 58;
     const z = 0.2 + random() * 22.2;
     if (!onLawn(x, z)) continue;
-    position.set(x, 0.019 + random() * 0.006, z);
+    position.set(x, 0.012 + random() * 0.004, z);
     euler.set(-Math.PI / 2, random() * Math.PI * 2, (random() - 0.5) * 0.22);
     quaternion.setFromEuler(euler);
-    scale.set(0.012 + random() * 0.012, 0.022 + random() * 0.018, 1);
+    scale.set(0.01 + random() * 0.012, 0.02 + random() * 0.018, 1);
     matrix.compose(position, quaternion, scale);
     fallen.setMatrixAt(fallenCount, matrix);
     color.setHex(fallenPalette[Math.floor(random() * fallenPalette.length)]);
@@ -295,39 +299,4 @@ export function addCourtyardMeadow(scene: THREE.Scene, isSoftwareGl: boolean): v
   fallen.instanceMatrix.needsUpdate = true;
   if (fallen.instanceColor) fallen.instanceColor.needsUpdate = true;
   scene.add(fallen);
-
-  // Soft translucent sun dapples beneath the cherry canopies.
-  const dappleCanvas = document.createElement('canvas');
-  dappleCanvas.width = dappleCanvas.height = 128;
-  const dappleContext = dappleCanvas.getContext('2d');
-  if (dappleContext) {
-    const gradient = dappleContext.createRadialGradient(64, 64, 4, 64, 64, 62);
-    gradient.addColorStop(0, 'rgba(255,238,188,0.2)');
-    gradient.addColorStop(0.55, 'rgba(255,231,184,0.09)');
-    gradient.addColorStop(1, 'rgba(255,231,184,0)');
-    dappleContext.fillStyle = gradient;
-    dappleContext.fillRect(0, 0, 128, 128);
-  }
-  const dappleTexture = new THREE.CanvasTexture(dappleCanvas);
-  dappleTexture.colorSpace = THREE.SRGBColorSpace;
-  const dappleMaterial = new THREE.MeshBasicMaterial({
-    map: dappleTexture,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    toneMapped: false,
-  });
-  for (let i = 0; i < 14; i++) {
-    const side = i % 2 ? 1 : -1;
-    const dapple = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.2 + random() * 2, 0.8 + random() * 1.5),
-      dappleMaterial
-    );
-    dapple.rotation.x = -Math.PI / 2;
-    dapple.rotation.z = random() * Math.PI;
-    dapple.position.set(side * (14.8 + random() * 5.2), 0.027, 9 + random() * 8);
-    dapple.renderOrder = 1;
-    dapple.receiveShadow = false;
-    scene.add(dapple);
-  }
 }
