@@ -2,3 +2,8 @@
 Sliding Florie in Idle Animations - creating a custom idle.
 Bad environement textures - Patch Later.
 Too frequent head rotations in Walk animation (correct later).
+
+10/11 bugs and logs :
+Sliding Florie in Idle Animations - resolved by a custom idle.
+Added a random "shyidle" in the Idle loop, with expression.
+Added blinking on Florie Model.
