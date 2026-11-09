@@ -56,10 +56,9 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh) || object.position.z > -5.84 || object.position.z < -5.97) return;
     if (Math.abs(object.position.x) > 3.1 || object.position.y > 3.5) return;
-    const dimensions = object.geometry.boundingBox;
-    if (!dimensions) object.geometry.computeBoundingBox();
-    const box3 = object.geometry.boundingBox;
-    if (box3 && (box3.max.y - box3.min.y) > 1.5) object.visible = false;
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    const bounds = object.geometry.boundingBox;
+    if (bounds && bounds.max.y - bounds.min.y > 1.5) object.visible = false;
   });
 
   // Hinged double doors. Each leaf pivots around its outside jamb and swings toward the courtyard.
@@ -79,17 +78,15 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
     box(leafWidth - 0.22, doorHeight - 0.2, 0.045, center, doorHeight / 2 + 0.01, 0.083, glass, leaf);
     box(leafWidth - 0.22, 0.12, 0.08, center, 1.08, 0.11, bronze, leaf);
     box(0.075, doorHeight - 0.18, 0.09, center, doorHeight / 2, 0.11, bronze, leaf);
-    // Brushed-metal pull handles and protective kick plates.
     box(0.055, 0.48, 0.08, -side * 0.17, 1.28, 0.16, stoneHi, leaf);
     const handle = mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.06, 16), bronze, leaf);
     handle.rotation.x = Math.PI / 2;
     handle.position.set(-side * 0.17, 1.53, 0.17);
     box(0.3, 0.32, 0.1, center, 0.28, 0.14, glassDark, leaf);
     box(0.3, 0.24, 0.1, center, doorHeight - 0.28, 0.14, glassDark, leaf);
-    // Subtle vertical glass reflection.
-    box(0.055, 1.65, 0.012, center - side * 0.34, 2.15, 0.113, stoneHi, leaf).material = mat(0xeaf5f3, 0.25, { transparent: true, opacity: 0.34 });
+    const reflection = box(0.055, 1.65, 0.012, center - side * 0.34, 2.15, 0.113, mat(0xeaf5f3, 0.25, { transparent: true, opacity: 0.34 }), leaf);
+    reflection.material.transparent = true;
   });
-  // Transom, side lights and polished threshold.
   box(3.08, 0.12, 0.18, 0, 3.2, -5.66, stoneHi);
   [-1.63, 1.63].forEach((x) => {
     box(0.12, 3.1, 0.13, x, 1.58, -5.68, bronze);
@@ -98,7 +95,6 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
     box(1.02, 0.12, 0.14, x, 0.07, -5.62, stoneHi);
   });
   box(3.05, 0.06, 0.72, 0, 0.045, -5.45, stoneHi);
-  // Keep the doorway traversable only while the door is swung open.
   const doorBlock: BoundingBox = { x0: -1.44, x1: 1.44, z0: -5.92, z1: -5.68 };
   boxes.push(doorBlock);
 
@@ -120,15 +116,11 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
     const now = performance.now();
     const dt = Math.min(0.05, (now - previousTime) / 1000);
     previousTime = now;
-    const target = opened ? 1.12 : 0;
-    angle += (target - angle) * Math.min(1, dt * 4.5);
-    leaves.forEach(({ group, side }) => {
-      group.rotation.y = -side * angle;
-    });
+    angle += ((opened ? 1.12 : 0) - angle) * Math.min(1, dt * 4.5);
+    leaves.forEach(({ group, side }) => { group.rotation.y = -side * angle; });
   };
-  const cleanup = scene.userData.cleanupCallbacks as Array<() => void> | undefined;
-  if (cleanup) cleanup.push(() => window.removeEventListener('keydown', onKeyDown));
-  else scene.userData.cleanupCallbacks = [() => window.removeEventListener('keydown', onKeyDown)];
+  const cleanupCallbacks = (scene.userData.cleanupCallbacks ??= []) as Array<() => void>;
+  cleanupCallbacks.push(() => window.removeEventListener('keydown', onKeyDown));
 
   // Fine window trim and small warm sconces around the entry.
   [-1, 1].forEach((side) => {
@@ -224,7 +216,6 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
   entryLight.position.set(0, 3.1, -4.6);
   scene.add(entryLight);
 
-  // Keyboard hint. This is intentionally a small in-world HUD tag and cleans itself up with the scene.
   const hint = document.createElement('div');
   hint.textContent = 'E  ·  Ouvrir / fermer la porte';
   hint.setAttribute('aria-live', 'polite');
@@ -236,11 +227,10 @@ export function buildAnimeCourtyard(scene: THREE.Scene, boxes: BoundingBox[], is
     letterSpacing: '.03em', pointerEvents: 'none', opacity: '0', transition: 'opacity 160ms ease',
   });
   document.body.appendChild(hint);
-  const cleanup = scene.userData.cleanupCallbacks as Array<() => void> | undefined;
   const dispose = () => {
     window.removeEventListener('keydown', onKeyDown);
     hint.remove();
   };
-  if (cleanup) cleanup.push(dispose);
-  else scene.userData.cleanupCallbacks = [dispose];
+  const cleanupCallbacks = (scene.userData.cleanupCallbacks ??= []) as Array<() => void>;
+  cleanupCallbacks.push(dispose);
 }
