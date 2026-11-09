@@ -730,10 +730,15 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
     (fbx) => {
       if (fbx.animations && fbx.animations.length > 0) {
         const rawClip = fbx.animations[0];
-        // Filter out root translation track so Florie stays grounded in place without teleporting
-        const filteredTracks = rawClip.tracks.filter(
-          (t) => !t.name.startsWith('Armature.position')
-        );
+        // The Bashful clip is a locomotion clip: the root (Armature) travels and turns, and the legs step.
+        // Keep only upper-body rotations so Florie idles in place without sliding feet or a spinning body.
+        const UPPER_BODY =
+          /^J_Bip_(C_(Spine|Chest|UpperChest|Neck|Head)|[LR]_(Shoulder|UpperArm|LowerArm|Hand|Thumb\d|Index\d|Middle\d|Ring\d|Little\d))\.quaternion$/;
+        const filteredTracks = rawClip.tracks.filter((t) => UPPER_BODY.test(t.name));
+        if (filteredTracks.length === 0) {
+          console.warn('bashful.fbx: no upper-body tracks matched, idle clip ignored. Tracks:', rawClip.tracks.slice(0, 5).map((t) => t.name));
+          return;
+        }
         const clip = new THREE.AnimationClip(
           'bashful_idle',
           rawClip.duration,
@@ -765,6 +770,8 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         if (o instanceof THREE.Mesh) {
           o.castShadow = true;
           o.receiveShadow = true;
+          // Skinned bounds come from the bind pose; animated limbs can leave them and the mesh pops out of view
+          o.frustumCulled = false;
 
           // Collect face meshes for blendshape / morph target blinking
           if (o.morphTargetDictionary && o.morphTargetInfluences) {
@@ -991,7 +998,11 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         }
 
         if (boneMap._head && initialQuat._head) {
-          boneMap._head.rotateY(Math.sin(phase * 0.5) * 0.02 * walk);
+          // Absolute target (not an incremental rotateY) so the result does not depend on frame rate
+          const headQ = initialQuat._head
+            .clone()
+            .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(phase * 0.5) * 0.03));
+          boneMap._head.quaternion.slerp(headQ, walkWeight);
         }
       } else if (!glbMixer) {
         // Fallback procedural pose if FBX animation is still loading

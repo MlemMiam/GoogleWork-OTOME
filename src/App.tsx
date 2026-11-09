@@ -317,7 +317,8 @@ export default function App() {
       florie.updateAnimation(dt, totalTime, st.phase, st.walk, isShift);
 
       // Camera 3rd person follow with wall collision raycasting
-      camTarget.set(st.x, st.closeup ? 1.32 : 1.22, st.z);
+      // The VRoid model's head bone sits at y = 1.43 (total height about 1.65)
+      camTarget.set(st.x, st.closeup ? 1.55 : 1.42, st.z);
       const cp = Math.cos(st.camPitch);
       tmpDir.set(Math.sin(st.camYaw) * cp, Math.sin(st.camPitch), Math.cos(st.camYaw) * cp);
       let dist = st.camDist;
