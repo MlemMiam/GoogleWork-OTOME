@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { plaidTex } from './textures';
 
 export interface FlorieCharacter {
@@ -670,21 +671,85 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
     if (o instanceof THREE.Mesh) o.receiveShadow = false;
   });
 
+  // Face meshes with morph targets for natural anime eye blinking
+  const faceMorphMeshes: THREE.Mesh[] = [];
+  let isBlinking = false;
+  let currentBlink = 0;
+
   const setBlink = (b: boolean) => {
+    isBlinking = b;
+    // Procedural model eyes
     const s = b ? 0.12 : 1;
     eyes.forEach((e) => {
       e.scale.y = s;
+    });
+
+    // GLB VRoid model morph-targets (instant key)
+    const inf = b ? 1.0 : 0.0;
+    faceMorphMeshes.forEach((mesh) => {
+      if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+        const dict = mesh.morphTargetDictionary;
+        const targets = mesh.morphTargetInfluences;
+        const closeIdx = dict['Fcl_EYE_Close'];
+        if (closeIdx !== undefined) targets[closeIdx] = inf;
+        const iris = dict['Fcl_EYE_Iris_Hide'];
+        if (iris !== undefined) targets[iris] = inf;
+        const hl = dict['Fcl_EYE_Highlight_Hide'];
+        if (hl !== undefined) targets[hl] = inf;
+        const closeL = dict['Fcl_EYE_Close_L'];
+        const closeR = dict['Fcl_EYE_Close_R'];
+        if (closeL !== undefined && closeIdx === undefined) targets[closeL] = inf;
+        if (closeR !== undefined && closeIdx === undefined) targets[closeR] = inf;
+      }
     });
   };
 
   rootGroup.position.set(initialX, 0, initialZ);
 
-  // GLB Model Loading
+  // GLB Model & FBX Idle Animation Loading
   let glbModel: THREE.Group | null = null;
   let glbMixer: THREE.AnimationMixer | null = null;
+  let idleAction: THREE.AnimationAction | null = null;
+  let loadedIdleClip: THREE.AnimationClip | null = null;
   let glbLoaded = false;
   const boneMap: Record<string, THREE.Bone> = {};
   const initialQuat: Record<string, THREE.Quaternion> = {};
+
+  const setupMixerWithClip = (model: THREE.Group, clip: THREE.AnimationClip) => {
+    glbMixer = new THREE.AnimationMixer(model);
+    idleAction = glbMixer.clipAction(clip);
+    idleAction.setLoop(THREE.LoopRepeat, Infinity);
+    idleAction.play();
+  };
+
+  const fbxLoader = new FBXLoader();
+  const FBX_URL = '/models/bashful.fbx';
+
+  fbxLoader.load(
+    FBX_URL,
+    (fbx) => {
+      if (fbx.animations && fbx.animations.length > 0) {
+        const rawClip = fbx.animations[0];
+        // Filter out root translation track so Florie stays grounded in place without teleporting
+        const filteredTracks = rawClip.tracks.filter(
+          (t) => !t.name.startsWith('Armature.position')
+        );
+        const clip = new THREE.AnimationClip(
+          'bashful_idle',
+          rawClip.duration,
+          filteredTracks
+        );
+        loadedIdleClip = clip;
+        if (glbModel && !glbMixer) {
+          setupMixerWithClip(glbModel, loadedIdleClip);
+        }
+      }
+    },
+    undefined,
+    (err) => {
+      console.warn('Could not load bashful.fbx animation:', err);
+    }
+  );
 
   const loader = new GLTFLoader();
   const GLB_URL = '/models/florie.glb';
@@ -700,6 +765,12 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         if (o instanceof THREE.Mesh) {
           o.castShadow = true;
           o.receiveShadow = true;
+
+          // Collect face meshes for blendshape / morph target blinking
+          if (o.morphTargetDictionary && o.morphTargetInfluences) {
+            faceMorphMeshes.push(o);
+          }
+
           const materials = Array.isArray(o.material) ? o.material : [o.material];
           materials.forEach((mat) => {
             if (mat instanceof THREE.MeshStandardMaterial) {
@@ -820,7 +891,10 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         procGroup.visible = true;
       }
 
-      if (gltf.animations && gltf.animations.length > 0) {
+      // If bashful idle clip already loaded, initialize mixer
+      if (loadedIdleClip && !glbMixer) {
+        setupMixerWithClip(glbModel, loadedIdleClip);
+      } else if (gltf.animations && gltf.animations.length > 0) {
         glbMixer = new THREE.AnimationMixer(glbModel);
         const idle = gltf.animations.find((a) => /idle/i.test(a.name)) || gltf.animations[0];
         glbMixer.clipAction(idle).play();
@@ -855,55 +929,84 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
     const s = Math.sin(phase);
     const amp = walk * (isShift ? 0.85 : 0.6);
 
+    // 1. Update smooth blink on GLB morph targets
+    const targetBlink = isBlinking ? 1.0 : 0.0;
+    const blinkSpeed = isBlinking ? 38 : 22;
+    currentBlink += (targetBlink - currentBlink) * Math.min(1, dt * blinkSpeed);
+
+    faceMorphMeshes.forEach((mesh) => {
+      if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+        const dict = mesh.morphTargetDictionary;
+        const targets = mesh.morphTargetInfluences;
+        const closeIdx = dict['Fcl_EYE_Close'];
+        if (closeIdx !== undefined) targets[closeIdx] = currentBlink;
+        const iris = dict['Fcl_EYE_Iris_Hide'];
+        if (iris !== undefined) targets[iris] = currentBlink * 0.95;
+        const hl = dict['Fcl_EYE_Highlight_Hide'];
+        if (hl !== undefined) targets[hl] = currentBlink * 0.95;
+        const closeL = dict['Fcl_EYE_Close_L'];
+        const closeR = dict['Fcl_EYE_Close_R'];
+        if (closeL !== undefined && closeIdx === undefined) targets[closeL] = currentBlink;
+        if (closeR !== undefined && closeIdx === undefined) targets[closeR] = currentBlink;
+      }
+    });
+
+    // 2. Character body animation
     if (activeModel === 'glb' && glbModel && glbModel.visible) {
+      const walkWeight = Math.min(1, walk * 2.0);
+      const idleWeight = 1 - walkWeight;
+
       if (glbMixer) {
-        glbMixer.timeScale = walk * (isShift ? 1.6 : 1.0);
+        if (idleAction) {
+          idleAction.setEffectiveWeight(idleWeight);
+        }
         glbMixer.update(dt);
-      } else {
-        // VRoid humanoid bone animation:
-        // rotateX(-1.25) lowers arms down from T-pose to rest naturally along the skirt
+      }
+
+      if (walkWeight > 0.02) {
+        // Blend walk cycle on legs
+        if (boneMap._lLeg && initialQuat._lLeg) {
+          const swingQ = initialQuat._lLeg.clone();
+          swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), s * amp * 0.65));
+          boneMap._lLeg.quaternion.slerp(swingQ, walkWeight);
+        }
+        if (boneMap._rLeg && initialQuat._rLeg) {
+          const swingQ = initialQuat._rLeg.clone();
+          swingQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -s * amp * 0.65));
+          boneMap._rLeg.quaternion.slerp(swingQ, walkWeight);
+        }
+
+        // Arm swing when walking
+        if (boneMap._lArm && initialQuat._lArm) {
+          const armQ = initialQuat._lArm.clone();
+          const armEuler = new THREE.Euler(-1.25, 0, s * amp * 0.45, 'YXZ');
+          armQ.multiply(new THREE.Quaternion().setFromEuler(armEuler));
+          boneMap._lArm.quaternion.slerp(armQ, walkWeight);
+        }
+        if (boneMap._rArm && initialQuat._rArm) {
+          const armQ = initialQuat._rArm.clone();
+          const armEuler = new THREE.Euler(-1.25, 0, -s * amp * 0.45, 'YXZ');
+          armQ.multiply(new THREE.Quaternion().setFromEuler(armEuler));
+          boneMap._rArm.quaternion.slerp(armQ, walkWeight);
+        }
+
+        if (boneMap._head && initialQuat._head) {
+          boneMap._head.rotateY(Math.sin(phase * 0.5) * 0.02 * walk);
+        }
+      } else if (!glbMixer) {
+        // Fallback procedural pose if FBX animation is still loading
         if (boneMap._lArm && initialQuat._lArm) {
           boneMap._lArm.quaternion.copy(initialQuat._lArm);
           boneMap._lArm.rotateX(-1.25);
-          // Walking swing around Z axis
-          boneMap._lArm.rotateZ(s * amp * 0.45);
         }
         if (boneMap._rArm && initialQuat._rArm) {
           boneMap._rArm.quaternion.copy(initialQuat._rArm);
           boneMap._rArm.rotateX(-1.25);
-          // Walking swing opposite
-          boneMap._rArm.rotateZ(-s * amp * 0.45);
         }
-
-        // Forearm: natural slight bend forward at rest
-        if (boneMap._lForearm && initialQuat._lForearm) {
-          boneMap._lForearm.quaternion.copy(initialQuat._lForearm);
-          boneMap._lForearm.rotateX(-0.15);
-        }
-        if (boneMap._rForearm && initialQuat._rForearm) {
-          boneMap._rForearm.quaternion.copy(initialQuat._rForearm);
-          boneMap._rForearm.rotateX(-0.15);
-        }
-
-        // Legs: rotateX swings legs forward/backward naturally
-        if (boneMap._lLeg && initialQuat._lLeg) {
-          boneMap._lLeg.quaternion.copy(initialQuat._lLeg);
-          boneMap._lLeg.rotateX(s * amp * 0.65);
-        }
-        if (boneMap._rLeg && initialQuat._rLeg) {
-          boneMap._rLeg.quaternion.copy(initialQuat._rLeg);
-          boneMap._rLeg.rotateX(-s * amp * 0.65);
-        }
-
-        // Spine breathing and Head bobbing
         if (boneMap._spine && initialQuat._spine) {
-          const breathe = Math.sin(time * 2) * 0.005 * (1 - walk);
+          const breathe = Math.sin(time * 2) * 0.005;
           boneMap._spine.quaternion.copy(initialQuat._spine);
           boneMap._spine.rotateX(breathe);
-        }
-        if (boneMap._head && initialQuat._head) {
-          boneMap._head.quaternion.copy(initialQuat._head);
-          boneMap._head.rotateY(Math.sin(phase * 0.5) * 0.02 * walk);
         }
       }
     } else {
