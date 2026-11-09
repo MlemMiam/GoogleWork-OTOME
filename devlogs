@@ -7,3 +7,7 @@ Too frequent head rotations in Walk animation (correct later).
 Sliding Florie in Idle Animations - resolved by a custom idle.
 Added a random "shyidle" in the Idle loop, with expression.
 Added blinking on Florie Model.
+
+Added a custom walking animation - in correction.
+ -The arms were swinging left and right, but resolved now.
+-Trying to correct the rigidity of the arms, by rotating more articulations...
