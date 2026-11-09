@@ -62,21 +62,21 @@ function buildWalkMotions(secondary: THREE.Bone[]): Record<string, Motion> {
   // single frequency (no double-bounce) for a clean, wobble-free anime gait.
   // Every joint (shoulder, upper arm, elbow, wrist, fingers) participates with
   // progressive lags so the arm feels supple, fluid and cartoon-natural.
-  const armAmp = 0.36;
-  const armSwingL = (t: number) => -armAmp * Math.sin(phi(t));
-  const armSwingR = (t: number) => armAmp * Math.sin(phi(t));
+  const armAmp = 0.40;
+  const armSwingL = (t: number) => -armAmp * Math.sin(phi(t) - 0.10);
+  const armSwingR = (t: number) => armAmp * Math.sin(phi(t) - 0.10);
 
   // Elbow flexes when the arm swings forward, extends on the backswing.
-  const elbowFlexL = (t: number) => 0.14 - 0.13 * Math.sin(phi(t) - 0.35);
-  const elbowFlexR = (t: number) => 0.14 - 0.13 * Math.sin(phi(t) - 0.35);
+  const elbowFlexL = (t: number) => 0.16 - 0.18 * Math.sin(phi(t) - 0.35);
+  const elbowFlexR = (t: number) => 0.16 - 0.18 * Math.sin(phi(t) - 0.35);
 
   // Wrist trails the forearm (follow-through).
-  const wristTrailL = (t: number) => -0.16 * Math.sin(phi(t) - 0.65);
-  const wristTrailR = (t: number) => 0.16 * Math.sin(phi(t) - 0.65);
+  const wristTrailL = (t: number) => -0.22 * Math.sin(phi(t) - 0.65);
+  const wristTrailR = (t: number) => 0.22 * Math.sin(phi(t) - 0.65);
 
   // Shoulder roll follows the arm swing.
-  const shoulderRollL = (t: number) => -0.05 * Math.sin(phi(t) - 0.05);
-  const shoulderRollR = (t: number) => 0.05 * Math.sin(phi(t) - 0.05);
+  const shoulderRollL = (t: number) => -0.08 * Math.sin(phi(t) - 0.05);
+  const shoulderRollR = (t: number) => 0.08 * Math.sin(phi(t) - 0.05);
 
   const motions: Record<string, Motion> = {
     // --- Pelvis / Hips ---
@@ -197,16 +197,16 @@ function addWalkFingerMotions(motions: Record<string, Motion>) {
     for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
       for (const segment of [1, 2, 3]) {
         motions[`J_Bip_${side}_${finger}${segment}`] = {
-          rx: (t) => -0.035 * segment *
+          rx: (t) => -0.05 * segment *
             (0.5 + 0.5 * (isLeft ? -Math.sin(phi(t) - 0.8) : Math.sin(phi(t) - 0.8))),
         };
       }
     }
     motions[`J_Bip_${side}_Thumb1`] = {
-      rz: (t) => (isLeft ? -0.04 : 0.04) * Math.sin(phi(t) - 0.9),
+      rz: (t) => (isLeft ? -0.06 : 0.06) * Math.sin(phi(t) - 0.9),
     };
     motions[`J_Bip_${side}_Thumb2`] = {
-      rz: (t) => (isLeft ? -0.02 : 0.02) * Math.sin(phi(t) - 0.9),
+      rz: (t) => (isLeft ? -0.03 : 0.03) * Math.sin(phi(t) - 0.9),
     };
   }
 }
@@ -260,7 +260,7 @@ function addWalkSecondaryMotions(
       const sign = isLeft ? 1 : -1;
       motions[bone.name] = {
         quat: (t: number) => new THREE.Quaternion().setFromAxisAngle(
-          axis, sign * 0.14 * Math.sin(phi(t) - 0.50 - stagger)
+          axis, sign * 0.18 * Math.sin(phi(t) - 0.50 - stagger)
         ),
       };
     }
