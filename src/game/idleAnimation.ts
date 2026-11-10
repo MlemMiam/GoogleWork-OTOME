@@ -115,7 +115,7 @@ export function collectPose(root: THREE.Object3D): { bases: PoseSet; secondary: 
   return { bases, secondary };
 }
 
-const localRotate = (bases: PoseSet, name: string, x: number, y: number, z: number) => {
+export const localRotate = (bases: PoseSet, name: string, x: number, y: number, z: number) => {
   const base = bases[name];
   if (!base) return;
   base.quaternion.multiply(
@@ -123,7 +123,7 @@ const localRotate = (bases: PoseSet, name: string, x: number, y: number, z: numb
   );
 };
 
-const localSwing = (bases: PoseSet, name: string, angle: number) => {
+export const localSwing = (bases: PoseSet, name: string, angle: number) => {
   const base = bases[name];
   if (!base) return;
   base.quaternion.multiply(
@@ -160,6 +160,19 @@ export function applyRelaxedPose(bases: PoseSet) {
   // Final local swing pulls the hands forward, next to the skirt without clipping.
   localSwing(bases, 'J_Bip_L_UpperArm', -0.30);
   localSwing(bases, 'J_Bip_R_UpperArm', 0.30);
+
+  // Flare the skirt outward so the dress fabric stays cleanly detached from the legs and thighs.
+  const skirtBones = Object.keys(bases).filter((k) => /Skirt/.test(k));
+  for (const name of skirtBones) {
+    if (/SkirtSide/.test(name) && /0_01|1_01/.test(name)) {
+      const isLeft = /L_Skirt/.test(name);
+      localRotate(bases, name, 0, 0, isLeft ? -0.08 : 0.08);
+    } else if (/SkirtFront/.test(name) && /0_01|1_01/.test(name)) {
+      localRotate(bases, name, -0.08, 0, 0);
+    } else if (/SkirtBack/.test(name) && /0_01|1_01/.test(name)) {
+      localRotate(bases, name, 0.08, 0, 0);
+    }
+  }
 }
 
 /**

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {
   collectPose,
   applyRelaxedPose,
+  localRotate,
   sampleClip,
   addHandMotions,
   TAU,
@@ -220,21 +221,24 @@ function addWalkSecondaryMotions(
         rz: (t) => 0.034 * Math.sin(phi(t) - 0.40 - stagger),
       };
     } else if (isSkirt) {
-      // Skirt responds to leg stride and pelvic bounce
-      if (isLeftSkirt) {
+      // Skirt responds gracefully to leg stride, maintaining outward flare from the thighs
+      const isFront = /SkirtFront/.test(bone.name);
+      const isBack = /SkirtBack/.test(bone.name);
+      if (isFront) {
         motions[bone.name] = {
-          rx: (t) => 0.085 * Math.sin(phi(t) - stagger) + 0.040 * Math.cos(2 * phi(t)),
-          rz: (t) => 0.050 * Math.sin(phi(t) - stagger),
+          rx: (t) => -0.02 - 0.035 * Math.sin(phi(t) - stagger),
+          rz: (t) => (isLeftSkirt ? -0.015 : 0.015) * Math.sin(phi(t) - stagger),
         };
-      } else if (isRightSkirt) {
+      } else if (isBack) {
         motions[bone.name] = {
-          rx: (t) => -0.085 * Math.sin(phi(t) - stagger) + 0.040 * Math.cos(2 * phi(t)),
-          rz: (t) => -0.050 * Math.sin(phi(t) - stagger),
+          rx: (t) => 0.02 + 0.035 * Math.sin(phi(t) - stagger),
+          rz: (t) => (isLeftSkirt ? -0.015 : 0.015) * Math.sin(phi(t) - stagger),
         };
       } else {
+        // SkirtSide follows pelvic weight shift, flared outward from hips
         motions[bone.name] = {
-          rx: (t) => 0.040 * Math.cos(2 * phi(t) - stagger),
-          rz: (t) => 0.030 * Math.sin(phi(t) - stagger),
+          rx: (t) => 0.025 * Math.cos(2 * phi(t) - stagger),
+          rz: (t) => (isLeftSkirt ? -0.025 : 0.025) * Math.sin(phi(t) - stagger),
         };
       }
     } else if (isSleeve) {
@@ -250,5 +254,8 @@ function addWalkSecondaryMotions(
 export function createWalkAnimationClip(root: THREE.Object3D): THREE.AnimationClip {
   const { bases, secondary } = collectPose(root);
   applyRelaxedPose(bases);
+  // Spread arms slightly away from the body during the walk animation (+0.07 rad outward spread)
+  localRotate(bases, 'J_Bip_L_UpperArm', 0.07, 0, 0);
+  localRotate(bases, 'J_Bip_R_UpperArm', 0.07, 0, 0);
   return sampleClip(bases, buildWalkMotions(secondary), 'florie_anime_walk', WALK_DURATION);
 }
