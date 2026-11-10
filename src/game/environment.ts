@@ -15,6 +15,9 @@ import {
   flagTex,
   labelTex,
 } from './textures';
+import { buildAnimeCourtyard } from './animeCourtyard';
+import { addCourtyardMeadow } from './courtyardMeadow';
+import { buildDetailedCourtyard } from './detailedCourtyard';
 
 export interface WorldEnvironment {
   scene: THREE.Scene;
@@ -165,7 +168,7 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
     y: number,
     z: number,
     mat: THREE.Material,
-    seg = 16,
+    seg = 28,
     o?: { noShadow?: boolean }
   ): THREE.Mesh {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
@@ -185,9 +188,9 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
     sx = 1,
     sy = 1,
     sz = 1,
-    seg = 14
+    seg = 24
   ): THREE.Mesh {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg, (seg * 0.75) | 0), mat);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg, Math.round(seg * 0.75)), mat);
     m.position.set(x, y, z);
     m.scale.set(sx, sy, sz);
     m.castShadow = !isSoftwareGl;
@@ -370,14 +373,34 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
   scene.add(flag);
   const flagBase = Float32Array.from(flagGeo.attributes.position.array);
 
-  // --- Streetlamps ---
+  // --- High-fidelity Victorian Anime Streetlamps ---
   function lamp(x: number, z: number) {
-    mkCyl(0.16, 0.2, 0.35, x, 0, z, M.black, 10);
-    mkCyl(0.045, 0.06, 3.6, x, 0.3, z, M.black, 8);
-    mkBox(0.42, 0.5, 0.42, x, 3.9, z, M.lampGlass, { shadow: false });
-    mkBox(0.56, 0.1, 0.56, x, 4.4, z, M.black, { shadow: false });
-    mkCyl(0, 0.34, 0.28, x, 4.5, z, M.black, 4, { noShadow: true });
-    boxes.push({ x0: x - 0.2, x1: x + 0.2, z0: z - 0.2, z1: z + 0.2 });
+    // Stepped plinth & fluted base (24 segments)
+    mkCyl(0.20, 0.24, 0.22, x, 0, z, M.black, 24);
+    mkCyl(0.16, 0.20, 0.18, x, 0.22, z, M.black, 24);
+    // Fluted tapered post with decorative collars
+    mkCyl(0.065, 0.085, 3.4, x, 0.40, z, M.black, 24);
+    mkCyl(0.10, 0.10, 0.06, x, 1.85, z, M.gold, 24);
+    mkCyl(0.11, 0.085, 0.12, x, 3.80, z, M.black, 24);
+
+    // Decorative arched arm bracket
+    const arm = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.022, 12, 24, Math.PI * 0.9), M.black);
+    arm.rotation.z = Math.PI * 0.1;
+    arm.position.set(x, 3.98, z);
+    scene.add(arm);
+
+    // Hexagonal beveled lantern housing with warm glow
+    mkCyl(0.25, 0.17, 0.50, x, 4.04, z, M.lampGlass, 6, { noShadow: false });
+    // Brass lantern cap & ball finial
+    mkCyl(0.04, 0.28, 0.20, x, 4.54, z, M.black, 6, { noShadow: true });
+    mkSphere(0.055, x, 4.78, z, M.gold, 1, 1, 1, 16);
+
+    // Warm atmospheric point light
+    const pl = new THREE.PointLight(0xffe2ad, 0.45, 14, 1.8);
+    pl.position.set(x, 4.25, z);
+    scene.add(pl);
+
+    boxes.push({ x0: x - 0.25, x1: x + 0.25, z0: z - 0.25, z1: z + 0.25 });
   }
 
   [
@@ -393,19 +416,37 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
     [11, -6.5],
   ].forEach((p) => lamp(p[0], p[1]));
 
-  // --- Trees & Shrubs ---
+  // --- High-fidelity Organic Anime Trees ---
   function tree(x: number, z: number, s: number, leaf: THREE.Material, collide = true) {
-    mkCyl(0.07 * s, 0.12 * s, 2.4 * s, x, 0, z, M.trunk, 8);
-    const c = 2.6 * s;
+    // Smooth tapered trunk with subtle flare
+    mkCyl(0.10 * s, 0.18 * s, 2.5 * s, x, 0, z, M.trunk, 24);
+    // Root base flare
+    mkCyl(0.18 * s, 0.28 * s, 0.35 * s, x, 0, z, M.trunk, 24);
+
+    // Organic primary branches
+    const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * s, 0.10 * s, 1.4 * s, 16), M.trunk);
+    b1.position.set(x - 0.35 * s, 2.4 * s, z + 0.15 * s);
+    b1.rotation.z = Math.PI * 0.22;
+    scene.add(b1);
+
+    const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * s, 0.10 * s, 1.3 * s, 16), M.trunk);
+    b2.position.set(x + 0.38 * s, 2.3 * s, z - 0.2 * s);
+    b2.rotation.z = -Math.PI * 0.24;
+    scene.add(b2);
+
+    const c = 2.8 * s;
+    // Multi-tiered smooth canopy clusters with rich volume
     [
-      [0, c + 0.6 * s, 0, 1.15],
-      [0.55 * s, c, 0.2 * s, 0.8],
-      [-0.5 * s, c + 0.2 * s, -0.3 * s, 0.85],
-      [0.1 * s, c + 1.1 * s, 0.1 * s, 0.7],
+      [0, c + 0.7 * s, 0, 1.25, 1.1, 0.95, 1.1],
+      [0.65 * s, c + 0.15 * s, 0.25 * s, 0.95, 1.05, 0.9, 1.05],
+      [-0.6 * s, c + 0.3 * s, -0.35 * s, 0.98, 1.1, 0.88, 1.05],
+      [0.15 * s, c + 1.25 * s, 0.15 * s, 0.82, 1.0, 0.85, 1.0],
+      [-0.1 * s, c + 0.1 * s, 0.55 * s, 0.85, 1.05, 0.88, 1.0],
+      [0.2 * s, c - 0.1 * s, -0.5 * s, 0.78, 1.0, 0.85, 0.95],
     ].forEach((p) => {
-      mkSphere(0.9 * s, x + p[0], p[1], z + p[2], leaf, p[3], p[3] * 0.9, p[3], 10);
+      mkSphere(p[3] as number, x + (p[0] as number), (p[1] as number), z + (p[2] as number), leaf, p[4] as number, p[5] as number, p[6] as number, 26);
     });
-    if (collide) boxes.push({ x0: x - 0.25, x1: x + 0.25, z0: z - 0.25, z1: z + 0.25 });
+    if (collide) boxes.push({ x0: x - 0.35 * s, x1: x + 0.35 * s, z0: z - 0.35 * s, z1: z + 0.35 * s });
   }
 
   [
@@ -433,9 +474,10 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
     tree(x, z, 1.9 + rnd2() * 1.6, M.leafGreen, false);
   }
 
+  // --- High-fidelity Flowering Shrubs ---
   for (let i = 0; i < 22; i++) {
     const x = (i < 11 ? -1 : 1) * (8 + (i % 11) * 2.3);
-    mkSphere(0.55, x, 0.38, -6.9, M.shrub, 1.3, 0.75, 1, 10);
+    mkSphere(0.62, x, 0.42, -6.9, M.shrub, 1.25, 0.85, 1.05, 24);
   }
   [
     [-8.6, -4.4],
@@ -444,7 +486,7 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
     [3.9, 16],
     [-3.9, 4],
     [3.9, 4],
-  ].forEach((p) => mkSphere(0.5, p[0], 0.34, p[1], M.shrub, 1.2, 0.75, 1.1, 10));
+  ].forEach((p) => mkSphere(0.56, p[0], 0.38, p[1], M.shrub, 1.18, 0.82, 1.12, 24));
 
   // --- Yellow School Bus ---
   const bx = -24,
@@ -454,11 +496,17 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
   mkBox(8.4, 0.7, 2.54, bx, 1.6, bz, M.glassDark, { shadow: false });
   [-3.2, 3.2].forEach((dx) => {
     [-1, 1].forEach((s) => {
-      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.3, 16), M.black);
+      // 24-segment rubber tire with chrome hubcap
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.3, 24), M.black);
       w.rotation.x = Math.PI / 2;
       w.position.set(bx + dx, 0.55, bz + s * 1.1);
       w.castShadow = !isSoftwareGl;
       scene.add(w);
+
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.32, 24), M.metal);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.set(bx + dx, 0.55, bz + s * 1.1);
+      scene.add(hub);
     });
   });
 
@@ -469,14 +517,25 @@ export function buildEnvironment(isSoftwareGl: boolean): WorldEnvironment {
       cy = 70 + rnd2() * 30;
     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, fog: false });
     for (let k = 0; k < 5; k++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(8 + rnd2() * 7, 8, 6), mat);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(8 + rnd2() * 7, 16, 12), mat);
       m.position.set(cx + k * 9 - 18, cy + rnd2() * 3, cz + rnd2() * 6);
       m.scale.y = 0.55;
       scene.add(m);
     }
   }
 
+  // Stylized anime school entrance, glazed double doors, benches, crest, and cherry trees.
+  buildAnimeCourtyard(scene, boxes, isSoftwareGl);
+
+  // Fine meadow around the entry: soft grass tufts, tiny flowers, and scattered petals.
+  addCourtyardMeadow(scene, isSoftwareGl);
+
+  // High-fidelity detailed courtyard assets (fountain, bicycle pavilion, school bulletin board, vending machines, curbstones, planters).
+  buildDetailedCourtyard(scene, boxes, isSoftwareGl);
+
   const dispose = () => {
+    const callbacks = scene.userData.cleanupCallbacks as Array<() => void> | undefined;
+    callbacks?.forEach((cb) => cb());
     scene.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry?.dispose();

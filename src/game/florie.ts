@@ -782,6 +782,8 @@ export function createFlorie(scene: THREE.Scene, initialX = 0, initialZ = 16): F
         if (o instanceof THREE.Mesh) {
           o.castShadow = true;
           o.receiveShadow = true;
+          // Skinned bounds come from the bind pose; animated limbs can leave them and the mesh pops out of view
+          o.frustumCulled = false;
 
           // Collect face meshes for blendshape / morph target blinking
           if (o.morphTargetDictionary && o.morphTargetInfluences) {
